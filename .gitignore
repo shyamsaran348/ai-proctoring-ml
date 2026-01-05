@@ -1,0 +1,16 @@
+# ---- DATA (NEVER COMMIT) ----
+ml/data/raw/
+ml/data/processed/
+ml/data/sequences/
+ml/data/synthetic/
+
+# ---- MODEL OUTPUTS ----
+*.pth
+*.pt
+
+# ---- PYTHON ----
+__pycache__/
+*.pyc
+
+# ---- OS ----
+.DS_Store
