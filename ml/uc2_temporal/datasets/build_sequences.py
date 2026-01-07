@@ -43,7 +43,11 @@ transform = transforms.Compose([
 ])
 
 def load_image(path):
+    path = Path(path)
+    if not path.is_absolute():
+        path = PROJECT_ROOT / path
     return transform(Image.open(path).convert("RGB")).unsqueeze(0)
+
 
 # ============================
 # MAIN
