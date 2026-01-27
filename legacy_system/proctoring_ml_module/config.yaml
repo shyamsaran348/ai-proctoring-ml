@@ -1,0 +1,27 @@
+models:
+  uc1:
+    path: "proctoring_ml_module/models/uc1_resnet_embedder.pth"
+    embedding_dim: 256
+    backbone: "resnet50"
+  uc2:
+    path: "proctoring_ml_module/models/uc2_lstm.pth"
+    sequence_length: 60
+    input_dim: 1
+    hidden_dim: 64
+    num_layers: 2
+  uc5:
+    path: "proctoring_ml_module/models/uc5_risk_gru.pth"
+    input_dim: 2
+    hidden_dim: 32
+    max_history: 300  # How many previous frames to keep for fusion context (5-10 sec @ 30fps is too short, maybe 300 frames?)
+                      # Actually, if UC2 is 60 frames (2 sec @ 30fps?), UC5 should probably see more.
+                      # Let's set a reasonable buffer. If it grows too large, inference slows down.
+                      # For "continuous risk", maybe we just keep the whole session or a long window.
+                      # Let's default to a sliding window of 300 for now.
+
+inference:
+  device: "cpu" # Default to CPU for broad compatibility, change to "cuda" or "mps" if needed.
+  enrollment_transform:
+    resize: 224
+    mean: [0.485, 0.456, 0.406]
+    std: [0.229, 0.224, 0.225]

@@ -1,0 +1,1484 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DevProctor | Professional Coding Environment</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+
+  <!-- CodeMirror CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/dracula.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/hint/show-hint.min.css">
+
+  <style>
+    :root {
+      /* Palette: Slate & Indigo */
+      --primary: #4f46e5;
+      /* Indigo 600 */
+      --primary-hover: #4338ca;
+      /* Indigo 700 */
+      --bg-body: #f8fafc;
+      /* Slate 50 */
+      --bg-surface: #ffffff;
+      --bg-panel: #1e293b;
+      /* Slate 800 (Dark Panel) */
+
+      --text-main: #0f172a;
+      /* Slate 900 */
+      --text-secondary: #475569;
+      /* Slate 600 */
+      --text-on-dark: #f1f5f9;
+
+      --border: #e2e8f0;
+      /* Slate 200 */
+      --border-focus: #6366f1;
+      /* Indigo 500 ring */
+
+      --success: #10b981;
+      /* Emerald 500 */
+      --danger: #ef4444;
+      /* Red 500 */
+
+      --font-ui: 'Inter', sans-serif;
+      --font-code: 'JetBrains Mono', monospace;
+
+      --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+      --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+      --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+
+      --radius-sm: 6px;
+      --radius-md: 12px;
+    }
+
+    /* Reset & Base */
+    * {
+      box-sizing: border-box;
+      outline: none;
+    }
+
+    body {
+      margin: 0;
+      font-family: var(--font-ui);
+      background-color: var(--bg-body);
+      color: var(--text-main);
+      -webkit-font-smoothing: antialiased;
+      line-height: 1.5;
+    }
+
+    button {
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4,
+    p {
+      margin: 0;
+    }
+
+    /* Layout Utilities */
+    .hidden {
+      display: none !important;
+    }
+
+    .flex {
+      display: flex;
+    }
+
+    .flex-col {
+      flex-direction: column;
+    }
+
+    .items-center {
+      align-items: center;
+    }
+
+    .justify-between {
+      justify-content: space-between;
+    }
+
+    .gap-4 {
+      gap: 1rem;
+    }
+
+    .w-full {
+      width: 100%;
+    }
+
+    .h-full {
+      height: 100%;
+    }
+
+    /* Header */
+    header {
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border);
+      height: 64px;
+      display: flex;
+      align-items: center;
+      padding: 0 24px;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+
+    .brand {
+      font-weight: 700;
+      font-size: 20px;
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand span {
+      color: var(--text-main);
+    }
+
+    .user-profile {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      background: #f1f5f9;
+      padding: 6px 12px;
+      border-radius: 9999px;
+    }
+
+    /* Main Container */
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 32px 24px;
+    }
+
+    /* Problem Grid (Dashboard) */
+    .dashboard-header {
+      margin-bottom: 32px;
+    }
+
+    .dashboard-title {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .dashboard-subtitle {
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 24px;
+    }
+
+    .card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 24px;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+      border-color: #cbd5e1;
+    }
+
+    .card h3 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .card p {
+      color: var(--text-secondary);
+      font-size: 14px;
+      flex-grow: 1;
+      margin-bottom: 20px;
+      line-height: 1.6;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 20px;
+      border-radius: var(--radius-sm);
+      font-weight: 500;
+      font-size: 14px;
+      transition: all 0.2s;
+      border: 1px solid transparent;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+      box-shadow: 0 1px 2px 0 rgba(79, 70, 229, 0.3);
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: var(--primary-hover);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      filter: grayscale(1);
+    }
+
+    .btn-outline {
+      background: transparent;
+      border-color: var(--border);
+      color: var(--text-main);
+    }
+
+    .btn-outline:hover {
+      background: #f8fafc;
+      border-color: #cbd5e1;
+    }
+
+    .btn-danger {
+      background: var(--danger);
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #dc2626;
+    }
+
+    /* Exam Workspace Layout */
+    .workspace {
+      display: flex;
+      height: calc(100vh - 64px);
+      /* Full height minus header */
+      background: var(--bg-body);
+      overflow: hidden;
+    }
+
+    /* Left Panel: Problem Description */
+    .panel-left {
+      width: 35%;
+      border-right: 1px solid var(--border);
+      background: var(--bg-surface);
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .problem-content {
+      padding: 24px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .problem-content h2 {
+      font-size: 20px;
+      margin-bottom: 16px;
+      font-weight: 700;
+    }
+
+    .section-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-secondary);
+      font-weight: 600;
+      margin-top: 24px;
+      margin-bottom: 8px;
+    }
+
+    .data-block {
+      background: #f1f5f9;
+      padding: 12px;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-code);
+      font-size: 13px;
+      color: #334155;
+      white-space: pre-wrap;
+    }
+
+    /* Right Panel: Editor */
+    .panel-right {
+      width: 65%;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .editor-toolbar {
+      height: 48px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-surface);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      justify-content: space-between;
+    }
+
+    .select-lang {
+      padding: 6px 12px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: white;
+      font-size: 13px;
+    }
+
+    /* CodeMirror Adjustments */
+    .CodeMirror {
+      flex: 1;
+      height: auto !important;
+      font-family: var(--font-code) !important;
+      font-size: 14px;
+    }
+
+    .action-bar {
+      height: 64px;
+      border-top: 1px solid var(--border);
+      background: var(--bg-surface);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+    }
+
+    .timer-display {
+      font-family: var(--font-code);
+      font-weight: 600;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Output Console */
+    #output-panel {
+      height: 180px;
+      background: #0f172a;
+      /* Dark console */
+      color: #f8fafc;
+      border-top: 1px solid #334155;
+      display: none;
+      /* Toggled */
+      flex-direction: column;
+    }
+
+    .console-header {
+      padding: 8px 16px;
+      background: #1e293b;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #94a3b8;
+    }
+
+    .console-content {
+      padding: 16px;
+      font-family: var(--font-code);
+      font-size: 13px;
+      overflow-y: auto;
+      flex: 1;
+      white-space: pre-wrap;
+    }
+
+    /* Proctoring Widget (Floating) */
+    .proctor-widget {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      width: 300px;
+      background: var(--bg-surface);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-lg);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      z-index: 1000;
+      transition: all 0.3s ease;
+    }
+
+    .proctor-header {
+      padding: 12px 16px;
+      background: #f8fafc;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .proctor-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+    }
+
+    .status-dot.warning {
+      background: #f59e0b;
+    }
+
+    .status-dot.danger {
+      background: var(--danger);
+      animation: pulse-red 1s infinite;
+    }
+
+    @keyframes pulse-red {
+      0% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.4;
+      }
+
+      100% {
+        opacity: 1;
+      }
+    }
+
+    .proctor-video-container {
+      width: 100%;
+      height: 180px;
+      position: relative;
+      background: #000;
+      border-radius: 0 0 4px 4px;
+      overflow: hidden;
+    }
+
+    .proctor-video-container video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .proctor-video-container canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 10;
+    }
+
+    .proctor-warnings {
+      padding: 8px 16px;
+      font-size: 12px;
+      min-height: 24px;
+      color: #f59e0b;
+      background: #fffbeb;
+      border-top: 1px solid #fef3c7;
+    }
+
+    /* Verification Modal (Redesign) */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(4px);
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn 0.2s ease;
+    }
+
+    .modal {
+      background: var(--bg-surface);
+      border-radius: 20px;
+      padding: 40px;
+      width: 100%;
+      max-width: 480px;
+      text-align: center;
+      box-shadow: var(--shadow-lg);
+      border: 1px solid var(--border);
+      animation: slideUp 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+      }
+
+      to {
+        opacity: 1;
+      }
+    }
+
+    @keyframes slideUp {
+      from {
+        transform: translateY(20px);
+        opacity: 0;
+      }
+
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
+    .modal-icon {
+      width: 64px;
+      height: 64px;
+      background: #e0e7ff;
+      color: var(--primary);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 24px;
+      font-size: 32px;
+    }
+
+    .modal h2 {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 8px;
+    }
+
+    .modal p {
+      color: var(--text-secondary);
+      margin-bottom: 32px;
+    }
+
+    .video-preview {
+      width: 100%;
+      height: 260px;
+      background: #000;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 24px;
+      position: relative;
+      border: 2px solid var(--border);
+    }
+
+    .video-preview video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .status-text {
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 16px;
+      min-height: 20px;
+    }
+
+    /* Danger Popup */
+    .danger-popup {
+      position: fixed;
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #fef2f2;
+      border: 1px solid #fee2e2;
+      border-left: 4px solid var(--danger);
+      padding: 16px 24px;
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-lg);
+      z-index: 20000;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      animation: slideDown 0.3s ease;
+      display: none;
+    }
+
+    @keyframes slideDown {
+      from {
+        transform: translate(-50%, -20px);
+        opacity: 0;
+      }
+
+      to {
+        transform: translate(-50%, 0);
+        opacity: 1;
+      }
+    }
+
+    .danger-content strong {
+      color: #991b1b;
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    .danger-content span {
+      color: #b91c1c;
+      font-size: 14px;
+    }
+
+    /* Warning Overlay */
+    #warningOverlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.85);
+      /* Dark semi-transparent background */
+      display: none;
+      /* Hidden by default */
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      /* On top of everything */
+      backdrop-filter: blur(8px);
+    }
+
+    #warningContent {
+      background: #fff;
+      padding: 40px;
+      border-radius: 16px;
+      text-align: center;
+      max-width: 500px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      border-top: 6px solid #ef4444;
+      /* Red top border */
+      animation: shake 0.5s cubic-bezier(.36, .07, .19, .97) both;
+    }
+
+    @keyframes shake {
+
+      10%,
+      90% {
+        transform: translate3d(-1px, 0, 0);
+      }
+
+      20%,
+      80% {
+        transform: translate3d(2px, 0, 0);
+      }
+
+      30%,
+      50%,
+      70% {
+        transform: translate3d(-4px, 0, 0);
+      }
+
+      40%,
+      60% {
+        transform: translate3d(4px, 0, 0);
+      }
+    }
+
+    #warningIcon {
+      font-size: 48px;
+      color: #ef4444;
+      margin-bottom: 20px;
+    }
+
+    #warningTitle {
+      font-size: 24px;
+      font-weight: 700;
+      color: #1f2937;
+      margin-bottom: 12px;
+    }
+
+    #warningMessage {
+      font-size: 16px;
+      color: #4b5563;
+      line-height: 1.5;
+      margin-bottom: 24px;
+    }
+
+    #warningAction {
+      display: inline-block;
+      padding: 10px 24px;
+      background: #ef4444;
+      color: white;
+      font-weight: 600;
+      border-radius: 8px;
+      text-decoration: none;
+      cursor: default;
+      /* Not clickable to dismiss, must fix issue */
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Proctoring Warning Overlay -->
+  <div id="warningOverlay">
+    <div id="warningContent">
+      <div id="warningIcon">⚠️</div>
+      <div id="warningTitle">Proctoring Alert</div>
+      <div id="warningMessage">Please focus on the screen.</div>
+      <div id="warningAction">Fix Issue to Continue</div>
+    </div>
+  </div>
+
+  <!-- Danger Alert (Top Center) -->
+  <div id="risk-warning-overlay" class="modal-overlay" style="display: none; background: rgba(220, 38, 38, 0.2);">
+    <div class="modal" style="border-color: var(--danger); border-width: 2px;">
+      <div class="modal-icon" style="background: #fee2e2; color: var(--danger);">⚠️</div>
+      <h2 style="color: var(--danger);">Suspicious Activity Detected</h2>
+      <p id="warning-reason" style="margin-bottom: 24px;">Please focus on the screen to continue.</p>
+      <button class="btn btn-danger w-full" onclick="dismissWarning()">I Understand</button>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <header>
+    <div class="brand">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="#4f46e5" stroke-width="2" stroke-linejoin="round" />
+        <path d="M2 17L12 22L22 17" stroke="#4f46e5" stroke-width="2" stroke-linejoin="round" />
+        <path d="M2 12L12 17L22 12" stroke="#4f46e5" stroke-width="2" stroke-linejoin="round" />
+      </svg>
+      Dev<span>Proctor</span>
+    </div>
+    <div class="user-profile">
+      Student
+    </div>
+  </header>
+
+  <!-- DASHBOARD: Problem List -->
+  <main id="problem-list" class="container">
+    <div class="dashboard-header">
+      <h1 class="dashboard-title">Available Assessments</h1>
+      <p class="dashboard-subtitle">Select a challenge to demonstrate your skills.</p>
+    </div>
+    <div id="problems-grid" class="grid">
+      <!-- Problem Cards will be injected here -->
+    </div>
+  </main>
+
+  <!-- EXAM WORKSPACE (Hidden initially) -->
+  <div id="exam-section" class="workspace hidden">
+
+    <!-- Left: Problem -->
+    <div class="panel-left">
+      <div class="problem-content">
+        <h2 id="problem-title">Problem Title</h2>
+        <p id="problem-statement" style="line-height: 1.7; color: var(--text-secondary);">
+          Loading description...
+        </p>
+
+        <div class="section-title">Input Format</div>
+        <div id="problem-input" class="data-block"></div>
+
+        <div class="section-title">Output Format</div>
+        <div id="problem-output" class="data-block"></div>
+
+        <div class="section-title">Constraints</div>
+        <div id="problem-constraints" class="data-block"></div>
+      </div>
+    </div>
+
+    <!-- Right: Editor -->
+    <div class="panel-right">
+      <div class="editor-toolbar">
+        <div class="flex items-center gap-4">
+          <span style="font-size: 13px; font-weight: 600; color: var(--text-secondary);">SOLUTION.JS</span>
+          <select id="language" class="select-lang" onchange="changeLanguage()">
+            <option value="javascript">JavaScript</option>
+            <option value="python">Python</option>
+          </select>
+        </div>
+        <div class="timer-display">
+          <span>⏱️</span>
+          <span id="timer">00:00</span>
+        </div>
+      </div>
+
+      <!-- Editor Container -->
+      <div id="editor-container"></div>
+      <textarea id="editor" style="display: none;"></textarea>
+
+      <!-- Output Console (Toggled) -->
+      <div id="output-panel">
+        <div class="console-header">Console Output</div>
+        <div id="output" class="console-content">Run your code to see results here...</div>
+        <!-- Test Results will also go here -->
+        <div id="test-results" style="padding: 0 16px 16px; font-size: 13px;"></div>
+      </div>
+
+      <!-- Bottom Actions -->
+      <div class="action-bar">
+        <button class="btn btn-outline" onclick="toggleConsole()">Toggle Console</button>
+        <div class="flex gap-4">
+          <button class="btn btn-outline" onclick="runCode()">▶ Run Code</button>
+          <button class="btn btn-primary" onclick="submitCode()">Submit Solution</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Proctoring Floating Widget -->
+    <div id="proctoring-panel" class="proctor-widget">
+      <div class="proctor-header">
+        <div class="proctor-title">
+          <div id="status-dot" class="status-dot"></div>
+          <span id="proctoring-status-text">Initializing...</span>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="toggleProctorHelp()"
+            style="background:none; border:none; font-size: 14px; color: #94a3b8; cursor: pointer;">?</button>
+          <button onclick="toggleProctorMin()"
+            style="background:none; border:none; font-size: 12px; color: #94a3b8;">_</button>
+        </div>
+      </div>
+      <div class="proctor-video-container" id="proctoring-feed">
+        <!-- Webcam Feed Injected Here -->
+        <canvas id="proctor-canvas"></canvas>
+      </div>
+      <div id="proctoring-warnings" class="proctor-warnings">
+        <!-- Warnings appear here -->
+      </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div id="proctor-help-overlay" class="modal-overlay" style="display:none; z-index:9999;">
+      <div class="modal" style="max-width: 400px; text-align: left;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+          <h3 style="margin:0;">Proctoring Metrics</h3>
+          <button onclick="toggleProctorHelp()"
+            style="background:none; border:none; font-size:20px; cursor:pointer;">&times;</button>
+        </div>
+        <ul style="border-left: 3px solid var(--primary); padding-left: 12px; list-style:none; line-height:1.6;">
+          <li style="margin-bottom:10px;">
+            <strong>ID (0.0 - 1.0):</strong> Identity Match.<br>
+            <span style="font-size:12px; color:var(--text-secondary);">How much you look like your profile photo. Should
+              be > 0.6.</span>
+          </li>
+          <li style="margin-bottom:10px;">
+            <strong>S (0.0 - 1.0):</strong> Stability Score.<br>
+            <span style="font-size:12px; color:var(--text-secondary);">Lower is better. High score means excessive
+              movement.</span>
+          </li>
+          <li>
+            <strong>R (0.0 - 1.0):</strong> Total Risk Score.<br>
+            <span style="font-size:12px; color:var(--text-secondary);">0.1 is Safe. > 0.7 is High Risk.</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- HIDDEN BUTTON -->
+  <button id="back-button" class="hidden" onclick="goBack()"></button>
+
+  <!-- SCRIPTS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/javascript/javascript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/python/python.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/edit/closebrackets.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/edit/matchbrackets.min.js"></script>
+  <script>
+    // --- Global State ---
+    let currentProblem = null;
+    let currentSession = null;
+    let timerInterval = null;
+    let isSubmitted = false;
+    let proctoringStream = null;
+    let proctoringInterval = null;
+    let codeEditor = null;
+    let warningActive = false;
+    let warningDismissedTime = 0;
+
+    // --- New Warning Timer Globals ---
+    let warningTimer = null;
+    let isWarningActive = false;
+    const WARNING_GRACE_PERIOD_MS = 2000;
+
+
+    // --- Init ---
+    window.onload = function () {
+      loadProblems();
+    };
+
+    function toggleConsole() {
+      const p = document.getElementById('output-panel');
+      p.style.display = p.style.display === 'flex' ? 'none' : 'flex';
+    }
+
+    function toggleProctorMin() {
+      const w = document.getElementById('proctoring-panel');
+      const feed = document.getElementById('proctoring-feed');
+      if (feed.style.display === 'none') {
+        feed.style.display = 'block';
+        w.style.height = 'auto';
+      } else {
+        feed.style.display = 'none';
+        w.style.height = 'auto'; // collapses
+      }
+    }
+
+    async function loadProblems() {
+      const studentId = localStorage.getItem('student_id') || '';
+      const url = studentId ? `/api/problems/?student_id=${studentId}` : '/api/problems/';
+      try {
+        const res = await fetch(url);
+        const problems = await res.json();
+        renderProblemGrid(problems);
+      } catch (e) {
+        console.error("Failed to load problems", e);
+      }
+    }
+
+    function renderProblemGrid(problems) {
+      const grid = document.getElementById('problems-grid');
+      grid.innerHTML = '';
+
+      problems.forEach(p => {
+        const isCompleted = p.is_completed || false;
+        const card = document.createElement('div');
+        card.className = 'card';
+
+        // Difficulty Badge mapping (mock)
+        const diffColor = p.difficulty === 'Hard' ? '#ef4444' : (p.difficulty === 'Medium' ? '#f59e0b' : '#10b981');
+
+        card.innerHTML = `
+          <div class="flex justify-between items-center mb-2">
+             <h3>${p.title}</h3>
+             ${isCompleted ? '<span style="font-size:10px; background:#dcfce7; color:#166534; padding:2px 8px; border-radius:10px; font-weight:600;">COMPLETED</span>' : ''}
+          </div>
+          <p>${p.description ? p.description.substring(0, 80) + '...' : 'No description available.'}</p>
+          
+          ${isCompleted
+            ? `<button class="btn btn-outline" disabled>Assessment Completed</button>`
+            : `<button class="btn btn-primary" onclick="startExam(${p.id})">Start Assessment</button>`
+          }
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    async function startExam(problemId) {
+      // Prompt ID logic
+      let studentId = localStorage.getItem('student_id');
+      if (!studentId) {
+        studentId = prompt('Enter Student ID / Name:');
+        if (!studentId) return;
+        localStorage.setItem('student_id', studentId);
+      }
+
+      // API Call
+      try {
+        const res = await fetch(`/api/problems/${problemId}/start_exam/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ student_id: studentId })
+        });
+
+        if (!res.ok) throw new Error("Failed to start session");
+
+        const session = await res.json();
+        currentSession = session;
+        currentProblem = session.problem;
+
+        // VERIFICATION FLOW
+        await pollVerification(currentSession.session_id);
+
+        // Setup UI
+        setupExamUI();
+        startTimer(currentSession.time_remaining || 300);
+        startProctoring();
+
+      } catch (e) {
+        alert("Error starting exam: " + e.message);
+      }
+    }
+
+    function setupExamUI() {
+      // Switch Views
+      document.getElementById('problem-list').classList.add('hidden');
+      document.getElementById('exam-section').classList.remove('hidden');
+
+      // Populate Data
+      document.getElementById('problem-title').innerText = currentProblem.title;
+      document.getElementById('problem-statement').innerText = currentProblem.problem_statement;
+      document.getElementById('problem-input').innerText = currentProblem.input_format || "N/A";
+      document.getElementById('problem-output').innerText = currentProblem.output_format || "N/A";
+      document.getElementById('problem-constraints').innerText = currentProblem.constraints || "N/A";
+
+      // Init Editor
+      initializeCodeEditor();
+      updateEditorForLanguage();
+    }
+
+    // --- Verification Logic ---
+    async function pollVerification(sessionId) {
+      return new Promise((resolve) => {
+        // Create Overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+        overlay.innerHTML = `
+              <div class="modal">
+                <div class="modal-icon">📷</div>
+                <h2>Identity Verification</h2>
+                <p>Align your face clearly in the camera frame.</p>
+                <div class="video-preview">
+                   <video id="v-video" autoplay playsinline muted></video>
+                   <canvas id="v-canvas" style="display:none"></canvas>
+                </div>
+                <div id="v-status" class="status-text" style="color:#64748b">Initializing camera...</div>
+                <button id="v-btn" class="btn btn-primary w-full">Capture & Verify</button>
+              </div>
+            `;
+        document.body.appendChild(overlay);
+
+        const video = document.getElementById('v-video');
+        const canvas = document.getElementById('v-canvas');
+        const status = document.getElementById('v-status');
+        const btn = document.getElementById('v-btn');
+
+        let stream = null;
+
+        navigator.mediaDevices.getUserMedia({ video: true }).then(s => {
+          stream = s;
+          video.srcObject = stream;
+          status.innerText = "Ready to verify.";
+        }).catch(e => {
+          status.innerText = "Camera Access Denied";
+          status.style.color = "red";
+          btn.disabled = true;
+        });
+
+        btn.onclick = async () => {
+          btn.disabled = true;
+          btn.innerText = "Verifying...";
+          status.innerText = "Processing...";
+          status.style.color = "var(--primary)";
+
+          // Capture
+          canvas.width = 300;
+          canvas.height = (video.videoHeight / video.videoWidth) * 300;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const dataURL = canvas.toDataURL('image/jpeg', 0.85);
+
+          try {
+            // USE SERVER-SIDE USERNAME (Trusted)
+            const currentStudentId = "{{ user.username }}";
+            const r = await fetch(`/api/sessions/${sessionId}/verify_face_snapshot/`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ image: dataURL, student_id: currentStudentId })
+            });
+            const res = await r.json();
+
+            if (res.verified) {
+              status.innerText = "Verified! Redirecting...";
+              status.style.color = "var(--success)";
+              setTimeout(() => {
+                if (stream) stream.getTracks().forEach(t => t.stop());
+                document.body.removeChild(overlay);
+                resolve(true);
+              }, 1000);
+            } else {
+              status.innerText = res.error ? res.error : `Match Failed (Score: ${res.similarity ? res.similarity.toFixed(2) : 0}). Try Again.`;
+              status.style.color = "var(--danger)";
+              btn.disabled = false;
+              btn.innerText = "Retry";
+            }
+          } catch (e) {
+            status.innerText = "Server Error";
+            btn.disabled = false;
+            btn.innerText = "Retry";
+          }
+        };
+      });
+    }
+
+    // --- Proctoring Logic ---
+    async function startProctoring() {
+      try {
+        proctoringStream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240, facingMode: 'user' } });
+        const video = document.createElement('video');
+        video.srcObject = proctoringStream;
+        video.autoplay = true;
+        video.muted = true;
+        video.playsInline = true;
+        // Remove style width/height to let CSS control it via container
+
+        const feedContainer = document.getElementById('proctoring-feed');
+        feedContainer.innerHTML = '';
+
+        // Add Video
+        feedContainer.appendChild(video);
+
+        // Add Canvas
+        const canvas = document.createElement('canvas');
+        canvas.id = 'proctor-canvas';
+        feedContainer.appendChild(canvas);
+
+        // Analysis Loop
+        proctoringInterval = setInterval(async () => {
+          await updateProctoringStatus(video);
+        }, 200); // Faster updates (200ms) for smoother risk tracking
+
+      } catch (e) {
+        document.getElementById('proctoring-feed').innerHTML = '<div style="color:var(--danger); padding:20px; text-align:center;">Camera Error</div>';
+      }
+    }
+
+    async function updateProctoringStatus(videoEl) {
+      if (!videoEl || !currentSession) return;
+
+      // Capture frame
+      const canvas = document.createElement('canvas');
+      canvas.width = 300;
+      canvas.height = 225;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+      const dataURL = canvas.toDataURL('image/jpeg', 0.7);
+
+      try {
+        const res = await fetch(`/api/sessions/${currentSession.session_id}/frame/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ frame: dataURL })
+        });
+        const data = await res.json();
+        updateProctorUI(data); // Call unified updater
+      } catch (e) { }
+    }
+
+    function updateProctorUI(data) {
+      try {
+
+
+        const dot = document.getElementById('status-dot');
+        const text = document.getElementById('proctoring-status-text');
+        const warnDiv = document.getElementById('proctoring-warnings');
+
+        if (!dot || !text) return; // Basic safety
+
+
+        // Draw Bounding Boxes
+        const canvas = document.getElementById('proctor-canvas');
+        if (canvas && data.face_locations) {
+          const video = document.querySelector('#proctoring-feed video');
+          if (video) {
+            canvas.width = video.clientWidth;
+            canvas.height = video.clientHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Scale from capture size (approx 320x240) to display size
+            const scaleX = canvas.width / (video.videoWidth || 320);
+            const scaleY = canvas.height / (video.videoHeight || 240);
+
+            data.face_locations.forEach(box => {
+              const [top, right, bottom, left] = box;
+              const x = left * scaleX;
+              const y = top * scaleY;
+              const w = (right - left) * scaleX;
+              const h = (bottom - top) * scaleY;
+
+              ctx.beginPath();
+              ctx.rect(x, y, w, h);
+              ctx.lineWidth = 2;
+
+              // Color Logic
+              if (data.num_faces > 1) {
+                ctx.strokeStyle = '#ef4444'; // Red
+                ctx.fillStyle = 'rgba(239, 68, 68, 0.2)';
+                // Label
+                ctx.font = 'bold 12px Inter';
+                ctx.fillStyle = '#ef4444';
+                ctx.fillText("UNKNOWN FACE", x, y - 5);
+              } else if (data.uc1_identity_sim < 0.4) {
+                ctx.strokeStyle = '#f59e0b'; // Orange
+                ctx.fillStyle = 'rgba(245, 158, 11, 0.2)';
+              } else {
+                ctx.strokeStyle = '#10b981'; // Green
+                ctx.fillStyle = 'rgba(16, 185, 129, 0.1)';
+              }
+              ctx.stroke();
+              // ctx.fill(); // Optional fill
+            });
+          }
+        }
+
+        // --- WARNING POPUP LOGIC (WITH DEBOUNCE) ---
+        const warningOverlay = document.getElementById('risk-warning-overlay');
+        const warningMessageEl = document.getElementById('warning-reason');
+
+        let shouldWarn = false;
+        let msg = "";
+
+        // Condition 1: No Face
+        if (data.num_faces === 0) {
+          shouldWarn = true;
+          msg = "No Face Detected.<br>Please ensure your face is clearly visible in the camera frame.";
+        }
+        // Condition 2: Multiple Faces
+        else if (data.num_faces > 1) {
+          shouldWarn = true;
+          msg = "Multiple Faces Detected.<br>Only one person is allowed during the exam. Please ask others to leave.";
+        }
+        // Condition 3: High Risk (Not looking at screen / looking away)
+        else if (data.risk_score > 0.75) { // Using 0.75 as per original checkRiskAndWarn
+          shouldWarn = true;
+          msg = "High Suspicious Activity.<br>Please maintain eye contact with the screen.";
+        } else if (data.uc1_identity_sim < 0.3) { // Using 0.3 as per original checkRiskAndWarn
+          shouldWarn = true;
+          msg = "Identity Verification Failed.<br>Face does not match profile.";
+        }
+
+        if (shouldWarn) {
+          // If checking for warning and NOT already active, start timer
+          if (!warningTimer && !isWarningActive) {
+            console.log("Violation detected. Starting grace timer...");
+            warningTimer = setTimeout(() => {
+              // This runs only if violation persists for 2 seconds
+              warningMessageEl.innerHTML = msg;
+              warningOverlay.style.display = 'flex';
+              isWarningActive = true;
+              warningTimer = null; // Timer finished
+            }, WARNING_GRACE_PERIOD_MS);
+          }
+          // If warning is ALREADY active, just update text (no timer needed)
+          if (isWarningActive) {
+            warningMessageEl.innerHTML = msg;
+            warningOverlay.style.display = 'flex';
+          }
+        } else {
+          // SAFE STATE: Clear everything immediately
+          if (warningTimer) {
+            clearTimeout(warningTimer);
+            warningTimer = null;
+            console.log("Violation cleared before grace period ended.");
+          }
+          if (isWarningActive) {
+            warningOverlay.style.display = 'none';
+            isWarningActive = false;
+          }
+        }
+        // ---------------------------
+
+        // Visual Status
+        if (data.num_faces === 1) {
+          dot.className = 'status-dot'; // green
+          // Use backend text (ID | S | R) directly
+          if (data.head_pose && data.head_pose.includes('|')) {
+            text.innerText = data.head_pose;
+          } else {
+            text.innerText = `Monitoring (${Math.round((data.face_confidence || 1) * 100)}%)`;
+          }
+          text.style.color = 'var(--text-main)';
+        } else {
+          dot.className = 'status-dot danger';
+          text.innerText = data.num_faces === 0 ? "No Face Detected" : "Multiple Faces";
+          text.style.color = 'var(--danger)';
+        }
+
+        // Warnings List
+        let warns = [];
+        // Only show head pose in warnings if it's NOT the standard metrics string (i.e. if it's "Identity Mismatch" etc)
+        // Standard metrics string contains '|'
+
+        if (data.head_pose && !data.head_pose.includes('|') && !data.head_pose.includes('Center') && !data.head_pose.includes('Monitoring')) {
+          warns.push(data.head_pose);
+        }
+        if (data.left_eye_dir && data.left_eye_dir !== 'Center') warns.push("Eye: " + data.left_eye_dir);
+
+        if (warnDiv) {
+          warnDiv.innerHTML = warns.length > 0 ? warns.join(', ') : 'No anomalies detected';
+        }
+
+      } catch (err) {
+        console.error("ProctorUI Error:", err);
+        // Optional: Display error in status text for debugging
+        const text = document.getElementById('proctoring-status-text');
+        if (text) text.innerText = "Error: " + err.message;
+      }
+    }
+
+    // --- Risk & Warning Logic (Preserved) ---
+    // The previous checkRiskAndWarn and related functions are now replaced by the new logic in updateProctorUI
+    // function checkRiskAndWarn(data) {
+    //   if (Date.now() - warningDismissedTime < 10000) return;
+
+    //   const riskScore = data.risk_score || 0;
+    //   const simScore = data.uc1_identity_sim || 1.0;
+    //   let reason = "";
+
+    //   if (simScore < 0.3) {
+    //     reason = "Identity Verification Failed.<br>Face does not match profile.";
+    //   } else if (data.num_faces === 0) {
+    //     reason = "No Face Detected.<br>Please return to the frame immediately.";
+    //   } else if (data.num_faces > 1) {
+    //     reason = "Multiple Faces Detected.<br>Only one person is allowed.";
+    //   } else if (riskScore > 0.75) {
+    //     reason = "High Suspicious Activity.<br>Please maintain eye contact with the screen.";
+    //   }
+
+    //   if (reason) {
+    //     showWarningPopup(reason);
+    //   }
+    // }
+
+    function showWarningPopup(msg) {
+      // This function is now largely superseded by the new debounce logic
+      // but kept for potential other uses or if the new logic needs to call it.
+      if (isWarningActive) return; // Use new global state
+      const overlay = document.getElementById('risk-warning-overlay');
+      document.getElementById('warning-reason').innerHTML = msg;
+      overlay.style.display = 'flex';
+      isWarningActive = true; // Update new global state
+    }
+
+    function dismissWarning() {
+      document.getElementById('risk-warning-overlay').style.display = 'none';
+      isWarningActive = false; // Update new global state
+      warningDismissedTime = Date.now(); // This can still be useful for a cooldown
+      if (warningTimer) { // Also clear any pending timer if dismissed manually
+        clearTimeout(warningTimer);
+        warningTimer = null;
+      }
+    }
+
+    function toggleProctorHelp() {
+      const el = document.getElementById('proctor-help-overlay');
+      el.style.display = el.style.display === 'none' ? 'flex' : 'none';
+    }
+
+    // --- Editor & Submission ---
+    function initializeCodeEditor() {
+      if (codeEditor) return;
+      codeEditor = CodeMirror(document.getElementById('editor-container'), {
+        value: "",
+        mode: "javascript",
+        theme: "dracula",
+        lineNumbers: true,
+        indentUnit: 4,
+        autoCloseBrackets: true,
+        matchBrackets: true
+      });
+      codeEditor.on('change', cm => document.getElementById('editor').value = cm.getValue());
+    }
+
+    function changeLanguage() {
+      updateEditorForLanguage();
+    }
+
+    function updateEditorForLanguage() {
+      const lang = document.getElementById('language').value;
+      if (!codeEditor) initializeCodeEditor();
+      codeEditor.setOption('mode', lang === 'python' ? 'python' : 'javascript');
+
+      // Defaults
+      let defaultCode = "";
+      if (currentProblem && currentProblem.language_specific_code) {
+        defaultCode = currentProblem.language_specific_code[lang] || "";
+      }
+      if (!defaultCode) defaultCode = lang === 'python' ? "def solve(*args):\n    return None" : "function solve(...args) {\n  return null;\n}";
+
+      codeEditor.setValue(defaultCode);
+    }
+
+    async function runCode() {
+      const code = codeEditor.getValue();
+      const lang = document.getElementById('language').value;
+      const payload = { code, language: lang, test_cases: currentProblem.test_cases };
+
+      // Toggle Console Open
+      const consolePanel = document.getElementById('output-panel');
+      if (consolePanel.style.display !== 'flex') {
+        consolePanel.style.display = 'flex';
+      }
+      document.getElementById('output').innerText = "Running...";
+
+      try {
+        const res = await fetch('/api/execute/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const out = await res.json();
+
+        // Render Results
+        let outputHtml = "";
+        let passCount = 0;
+        if (out.results) {
+          out.results.forEach((r, i) => {
+            const status = r.passed ? "✅ Passed" : "❌ Failed";
+            if (r.passed) passCount++;
+            outputHtml += `[Test ${i + 1}] ${status}\nInput: ${JSON.stringify(r.input)}\nGot: ${JSON.stringify(r.actual)}\n\n`;
+          });
+          outputHtml += `Summary: ${passCount}/${out.results.length} Passed`;
+        } else {
+          outputHtml = "No output returned.";
+        }
+        document.getElementById('output').innerText = outputHtml;
+
+      } catch (e) {
+        document.getElementById('output').innerText = "Error: " + e.message;
+      }
+    }
+
+    async function submitCode() {
+      if (confirm("Submit solution?")) {
+        const code = codeEditor.getValue();
+        const lang = document.getElementById('language').value;
+        try {
+          const res = await fetch(`/api/sessions/${currentSession.session_id}/submit/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code, language: lang, student_id: localStorage.getItem('student_id') })
+          });
+          const out = await res.json();
+          alert(`Submission Complete. Score: ${out.score}/${out.max_score}`);
+          location.reload();
+        } catch (e) {
+          alert("Submission failed");
+        }
+      }
+    }
+
+    function startTimer(seconds) {
+      clearInterval(timerInterval);
+      const display = document.getElementById('timer');
+      timerInterval = setInterval(() => {
+        seconds--;
+        const m = Math.floor(seconds / 60);
+        const s = seconds % 60;
+        display.innerText = `${m}:${s.toString().padStart(2, '0')}`;
+        if (seconds <= 0) {
+          clearInterval(timerInterval);
+          alert("Time up!");
+          submitCode();
+        }
+      }, 1000);
+    }
+
+    function goBack() {
+      if (confirm("Exit exam? Progress will be lost.")) location.reload();
+    }
+  </script>
+</body>
+
+</html>

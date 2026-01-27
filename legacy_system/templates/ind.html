@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DevProctor | Secure Assessment Platform</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            /* Palette: Slate & Indigo */
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --bg-body: #f8fafc;
+            --bg-surface: #ffffff;
+            --text-main: #0f172a;
+            --text-secondary: #475569;
+            --border: #e2e8f0;
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            --radius-md: 12px;
+            --font-ui: 'Inter', sans-serif;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-ui);
+            background: var(--bg-body);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        header {
+            background: var(--bg-surface);
+            border-bottom: 1px solid var(--border);
+            height: 70px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .brand {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .brand span {
+            color: var(--text-main);
+        }
+
+        /* Main Content */
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 36px;
+            font-weight: 800;
+            margin-bottom: 16px;
+            letter-spacing: -0.02em;
+        }
+
+        p.subtitle {
+            font-size: 18px;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin-bottom: 48px;
+            line-height: 1.6;
+        }
+
+        .cards-container {
+            display: flex;
+            gap: 32px;
+            justify-content: center;
+            flex-wrap: wrap;
+            max-width: 900px;
+            width: 100%;
+        }
+
+        .role-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 40px;
+            width: 320px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: var(--shadow-md);
+        }
+
+        .role-card:hover {
+            transform: translateY(-8px);
+            box-shadow: var(--shadow-lg);
+            border-color: var(--primary);
+        }
+
+        .icon {
+            font-size: 48px;
+            margin-bottom: 24px;
+            display: block;
+        }
+
+        h3 {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        p.desc {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        /* Login Options (Hidden) */
+        .login-options {
+            display: none;
+            background: var(--bg-surface);
+            padding: 40px;
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-lg);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            border: 1px solid var(--border);
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 12px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 15px;
+            transition: background 0.2s;
+            cursor: pointer;
+            border: none;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-main);
+        }
+
+        .btn-outline:hover {
+            border-color: #cbd5e1;
+            background: #f1f5f9;
+        }
+
+        .btn-link {
+            background: none;
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+
+        .btn-link:hover {
+            color: var(--primary);
+        }
+
+        footer {
+            text-align: center;
+            padding: 24px;
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <div class="brand">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+            </svg>
+            Dev<span>Proctor</span>
+        </div>
+    </header>
+
+    <main>
+        <div id="roleSelection">
+            <h1>Secure Your Assessments</h1>
+            <p class="subtitle">AI-powered proctoring and identity verification for coding exams. Select your role to
+                get started.</p>
+
+            <div class="cards-container">
+                <div class="role-card" onclick="showLoginOptions('student')">
+                    <span class="icon">👨‍🎓</span>
+                    <h3>Student</h3>
+                    <p class="desc">Take assessments, solve coding challenges, and track your performance.</p>
+                </div>
+                <div class="role-card" onclick="showLoginOptions('faculty')">
+                    <span class="icon">👨‍🏫</span>
+                    <h3>Faculty</h3>
+                    <p class="desc">Create exams, monitor students in real-time, and view comprehensive reports.</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="loginOptions" class="login-options">
+            <h2 id="roleTitle" style="margin-bottom: 24px;">Login</h2>
+            <a id="loginLink" href="#" class="btn btn-primary">Login</a>
+            <a id="registerLink" href="#" class="btn btn-outline">Create Account</a>
+            <button onclick="backToHome()" class="btn btn-link">← Back to Role Selection</button>
+        </div>
+    </main>
+
+    <footer>
+        &copy; 2026 DevProctor Inc. All rights reserved.
+    </footer>
+
+    <script>
+        function showLoginOptions(role) {
+            document.getElementById('roleSelection').style.display = 'none';
+            document.getElementById('loginOptions').style.display = 'block';
+
+            const roleTitle = document.getElementById('roleTitle');
+            const loginLink = document.getElementById('loginLink');
+            const registerLink = document.getElementById('registerLink');
+
+            roleTitle.innerText = `${role.charAt(0).toUpperCase() + role.slice(1)} Portal`;
+
+            if (role === 'student') {
+                loginLink.href = '/login';
+                registerLink.href = '/register';
+            } else if (role === 'faculty') {
+                loginLink.href = '/faculty-login';
+                registerLink.href = '/faculty-register';
+            }
+        }
+
+        function backToHome() {
+            document.getElementById('roleSelection').style.display = 'block';
+            document.getElementById('loginOptions').style.display = 'none';
+        }
+    </script>
+</body>
+
+</html>

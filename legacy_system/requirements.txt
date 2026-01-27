@@ -1,0 +1,13 @@
+Django==4.2.7
+djangorestframework==3.14.0
+django-cors-headers==4.3.1
+python-dotenv==1.0.0
+mongoengine==0.27.0
+pymongo==4.6.1 
+Pillow==10.4.0
+torch
+torchvision
+numpy
+opencv-python
+pyyaml
+# deepface removed to avoid TF hang. Using UC1 Engine (Torch) instead.

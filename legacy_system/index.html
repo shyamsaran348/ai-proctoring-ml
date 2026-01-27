@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Coding Test | Redirecting to Django Version</title>
+  <meta http-equiv="refresh" content="3;url=http://localhost:8000/" />
+
+  <style>
+    :root {
+      --bg: #0f1221;
+      --panel: #161a2e;
+      --panel-2: #1d2240;
+      --text: #e9ecf1;
+      --muted: #aeb4c2;
+      --primary: #6ea8fe;
+      --primary-2: #3f7bfd;
+      --red: #ff5d5d;
+      --amber: #f1c40f;
+      --border: #2a3054;
+      --shadow: rgba(0, 0, 0, 0.35);
+      --code-bg: #0b0e1a;
+      --badge: #232a52;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      background: radial-gradient(1200px 800px at 10% 0%, #151a33, #0c1024 60%, #070a18 100%);
+      color: var(--text);
+      font-family: system-ui, sans-serif;
+      line-height: 1.45;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    header .brand { font-weight: 700; letter-spacing: .3px; }
+    header .brand span { color: var(--primary); }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 12px;
+    }
+    .badge.amber { background: rgba(241,196,15,.12); border: 1px solid rgba(241,196,15,.4); color: #ffe07a; }
+    .badge.red { background: rgba(255,93,93,.12); border: 1px solid rgba(255,93,93,.4); color: #ffb3b3; }
+    main { padding: 20px; max-width: 1200px; margin: 0 auto; }
+    .problem {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 18px;
+      box-shadow: 0 10px 30px var(--shadow);
+      margin-bottom: 16px;
+    }
+    .workspace {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 1000px) { .workspace { grid-template-columns: 1fr; } }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 10px 30px var(--shadow);
+    }
+    .editor-pane .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      background: var(--panel-2);
+      border-bottom: 1px solid var(--border);
+    }
+    .btn {
+      border: 1px solid var(--border);
+      background: var(--badge);
+      color: var(--text);
+      padding: 8px 12px;
+      font-weight: 600;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    .btn.primary { background: linear-gradient(180deg, var(--primary), var(--primary-2)); border: 1px solid #2753e6; }
+    .btn:disabled { opacity: .6; cursor: not-allowed; }
+    .editor {
+      width: 100%;
+      min-height: 420px;
+      background: var(--code-bg);
+      color: #d1e3ff;
+      border: 0;
+      padding: 14px;
+      font-family: monospace;
+      font-size: 14px;
+      line-height: 1.5;
+      outline: none;
+      resize: vertical;
+    }
+    .results { padding: 10px; max-height: 520px; overflow: auto; }
+    .test-row {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 8px 12px;
+      background: #11152b;
+      border: 1px solid #222a55;
+      padding: 10px;
+      border-radius: 10px;
+      margin: 8px 0;
+    }
+    .test-row.pass { border-color: rgba(46,204,113,.35); }
+    .test-row.fail { border-color: rgba(255,93,93,.35); }
+    .console {
+      background: #0a0e21;
+      border-top: 1px dashed var(--border);
+      padding: 10px;
+      font-family: monospace;
+      font-size: 13px;
+      color: #9ad0ff;
+      max-height: 160px;
+      overflow: auto;
+    }
+    .console .title { color: var(--muted); font-weight: 700; margin-bottom: 6px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">Code<span>Test</span> Demo</div>
+    <div class="badge amber">Redirecting...</div>
+    <div class="badge amber">Django Backend</div>
+  </header>
+
+  <main>
+    <section class="problem">
+      <h1>Redirecting to Django Backend</h1>
+      <p>This application has been upgraded to use Django framework with a full backend system.</p>
+      <p class="note">You will be redirected to the new Django version in a few seconds. If not, <a href="http://localhost:8000/" style="color: var(--primary);">click here</a>.</p>
+    </section>
+
+    <section class="workspace">
+      <div class="panel">
+        <div style="padding: 40px; text-align: center;">
+          <h2 style="color: var(--primary); margin-bottom: 20px;">🚀 New Features Available</h2>
+          <ul style="text-align: left; max-width: 500px; margin: 0 auto;">
+            <li>✅ Full Django backend with database</li>
+            <li>✅ RESTful API endpoints</li>
+            <li>✅ Admin interface for management</li>
+            <li>✅ Multi-language support (JavaScript & Python)</li>
+            <li>✅ Secure code execution</li>
+            <li>✅ Exam session tracking</li>
+            <li>✅ Comprehensive test case system</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+  </main>
+
+<script>
+  // Redirect to Django backend
+  console.log('Redirecting to Django backend...');
+  
+  // Show countdown
+  let countdown = 3;
+  const countdownElement = document.querySelector('.badge.amber');
+  
+  const countdownInterval = setInterval(() => {
+    countdown--;
+    countdownElement.textContent = `Redirecting in ${countdown}s...`;
+    
+    if (countdown <= 0) {
+      clearInterval(countdownInterval);
+      window.location.href = 'http://localhost:8000/';
+    }
+  }, 1000);
+</script>
+</body>
+</html>
