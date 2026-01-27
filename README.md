@@ -144,8 +144,24 @@ When running, the server outputs debug logs proving the AI is active:
 ```
 
 *   **Sim:** The Cosine Similarity score from the `UC1` Engine.
-*   **Risk:** The final fused risk score from `UC5`.
-
 ---
 
-**Developed by Google DeepMind Agentic Team**
+## 🚧 Known Limitations & Future Roadmap
+
+While the Proctoring Engine is advanced, some legacy features are still in development:
+
+1.  **Multiple Choice Questions (MCQ):**
+    *   *Current Status:* System only supports Coding Problems (Python/JS).
+    *   *Plan:* Add MCQ support with auto-grading in v2.0.
+
+2.  **Full Session Video Recording:**
+    *   *Current Status:* We capture snapshots and analytical logs (Risk Scores). We do **not** record the full video stream to save storage.
+    *   *Plan:* Add optional cloud recording for high-stakes exams.
+
+3.  **Mobile Support:**
+    *   *Current Status:* The UI is responsive, but webcam proctoring is optimized for Desktop/Laptop browsers (Chrome/Firefox).
+    *   *Plan:* Native Mobile App integration.
+
+4.  **Advanced Analytics Dashboard:**
+    *   *Current Status:* Instructors see simple pass/fail and risk logs.
+    *   *Plan:* Add detailed replay timelines and cheat-probability heatmaps.
