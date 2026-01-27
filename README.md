@@ -5,6 +5,27 @@ This repository hosts a hybrid AI-Proctoring solution that combines a robust Dja
 
 ---
 
+## 💻 Core Software Features
+
+Beyond the AI, this is a fully functional **Coding Exam Platform**:
+1.  **Multi-Language Code Execution:**
+    *   Supports **Python** and **JavaScript**.
+    *   Runs code safely in sandboxed subprocesses.
+    *   Real-time stdout/stderr capture.
+2.  **Problem Management:**
+    *   Admins can create coding challenges with rich descriptions.
+    *   **Test Cases:** Supports Hidden vs. Public test cases for grading.
+3.  **Exam Session Engine:**
+    *   **Timers:** Auto-submits when time runs out.
+    *   **State Saving:** Prevents data loss if the browser crashes.
+    *   **Submission History:** Tracks every attempt and score.
+4.  **Tech Stack:**
+    *   **Backend:** Django 4.2 + Django REST Framework.
+    *   **Database:** SQLite (Dev) / PostgreSQL (Prod).
+    *   **Frontend:** Vanilla JS + HTML5 (No heavy frameworks required).
+
+---
+
 ## 🚀 Key Features (The "UC" Architecture)
 
 The system is built around strict "Use Cases" (UCs) that target specific cheating behaviors.
