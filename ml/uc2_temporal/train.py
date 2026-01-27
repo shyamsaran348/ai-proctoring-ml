@@ -1,40 +1,57 @@
-import torch
 import numpy as np
-from torch.utils.data import DataLoader, TensorDataset
-from sklearn.metrics import roc_auc_score
-from models.temporal_lstm import UC2TemporalLSTM
+import torch
+import torch.nn as nn
+from torch.utils.data import TensorDataset, DataLoader
+from pathlib import Path
+from temporal_lstm import TemporalLSTM
+from sklearn.model_selection import train_test_split
+
+BASE_DIR = Path(__file__).resolve().parent
+DATASET_DIR = BASE_DIR / "datasets"
+MODEL_DIR = BASE_DIR / "models"
+MODEL_DIR.mkdir(exist_ok=True)
+
+X = np.load("train_sequences_v2.npy")
+y = np.load("sequence_labels_v2.npy")
+
+
+X_train, X_val, y_train, y_val = train_test_split(
+    X, y, test_size=0.15, stratify=y, random_state=42
+)
+
+train_ds = TensorDataset(
+    torch.tensor(X_train, dtype=torch.float32),
+    torch.tensor(y_train, dtype=torch.float32)
+)
+
+val_ds = TensorDataset(
+    torch.tensor(X_val, dtype=torch.float32),
+    torch.tensor(y_val, dtype=torch.float32)
+)
+
+train_loader = DataLoader(train_ds, batch_size=32, shuffle=True)
+val_loader = DataLoader(val_ds, batch_size=32)
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-X = np.load("datasets/train_sequences.npy")
-y = np.load("datasets/sequence_labels.npy")
-
-X = torch.tensor(X, dtype=torch.float32)
-y = torch.tensor(y, dtype=torch.float32)
-
-dataset = TensorDataset(X, y)
-loader = DataLoader(dataset, batch_size=32, shuffle=True)
-
-model = UC2TemporalLSTM().to(device)
-criterion = torch.nn.BCEWithLogitsLoss()
+model = TemporalLSTM().to(device)
+criterion = nn.BCEWithLogitsLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
-for epoch in range(10):
+for epoch in range(15):
     model.train()
-    losses = []
+    total_loss = 0
 
-    for xb, yb in loader:
-        xb, yb = xb.to(device), yb.to(device)
-
-        logits = model(xb).squeeze()
-        loss = criterion(logits, yb)
-
+    for x_batch, y_batch in train_loader:
+        x_batch, y_batch = x_batch.to(device), y_batch.to(device)
         optimizer.zero_grad()
+        logits = model(x_batch)
+        loss = criterion(logits, y_batch)
         loss.backward()
         optimizer.step()
+        total_loss += loss.item()
 
-        losses.append(loss.item())
+    print(f"Epoch {epoch+1} | Train Loss: {total_loss/len(train_loader):.4f}")
 
-    print(f"Epoch {epoch} | Loss: {np.mean(losses):.4f}")
-
-torch.save(model.state_dict(), "models/uc2_lstm_temporal.pth")
+torch.save(model.state_dict(), MODEL_DIR / "lstm_uc2.pth")
+print("✅ UC2 LSTM model saved")

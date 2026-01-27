@@ -1,21 +1,56 @@
-import torch
 import numpy as np
+import torch
+from pathlib import Path
 from sklearn.metrics import roc_auc_score
-from models.temporal_lstm import UC2TemporalLSTM
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
+from temporal_lstm import TemporalLSTM
 
-X = np.load("datasets/test_sequences.npy")
-y = np.load("datasets/sequence_labels.npy")
+# ============================================================
+# PATHS
+# ============================================================
 
-X = torch.tensor(X, dtype=torch.float32).to(device)
+BASE_DIR = Path(__file__).resolve().parent
+DATASET_DIR = BASE_DIR / "datasets"
+MODEL_DIR = BASE_DIR / "models"
 
-model = UC2TemporalLSTM().to(device)
-model.load_state_dict(torch.load("models/uc2_lstm_temporal.pth"))
+OUT_DIR = Path("ml/uc5_risk_fusion/datasets")
+OUT_DIR.mkdir(parents=True, exist_ok=True)
+
+# ============================================================
+# LOAD DATA
+# ============================================================
+
+X = np.load(DATASET_DIR / "train_sequences_v2.npy")
+y = np.load(DATASET_DIR / "sequence_labels_v2.npy")
+
+# ============================================================
+# LOAD MODEL
+# ============================================================
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+model = TemporalLSTM().to(device)
+model.load_state_dict(torch.load(MODEL_DIR / "lstm_uc2.pth", map_location=device))
 model.eval()
 
-with torch.no_grad():
-    logits = model(X).squeeze().cpu().numpy()
+# ============================================================
+# INFERENCE
+# ============================================================
 
-auc = roc_auc_score(y, logits)
-print(f"UC2 ROC-AUC: {auc:.4f}")
+with torch.no_grad():
+    logits = model(torch.tensor(X, dtype=torch.float32).to(device))
+    probs = torch.sigmoid(logits).cpu().numpy().squeeze()
+
+# ============================================================
+# METRIC (OPTIONAL)
+# ============================================================
+
+auc = roc_auc_score(y, probs)
+print(f"[METRIC] UC2 AUC: {auc:.6f}")
+
+# ============================================================
+# EXPORT FOR PHASE 5
+# ============================================================
+
+np.save(OUT_DIR / "uc2_probs.npy", probs)
+print(f"[SAVED] uc2_probs.npy | windows = {len(probs)}")

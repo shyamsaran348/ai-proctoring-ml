@@ -1,10 +1,4 @@
 # ============================
-# PATH SETUP (VERY IMPORTANT)
-# ============================
-import sys
-from pathlib import Path
-
-# ============================
 # PATH SETUP (KAGGLE-SAFE)
 # ============================
 import os
@@ -25,6 +19,7 @@ import torch
 import yaml
 import numpy as np
 import pandas as pd
+import random
 from torchvision import transforms
 from PIL import Image
 from sklearn.metrics.pairwise import cosine_similarity
@@ -43,6 +38,12 @@ SPLITS = BASE_DIR / "uc1_identity/datasets/splits.yaml"
 SEQ_LEN = 60
 SWITCH_RANGE = (15, 45)
 
+NEGATIVE_MODES = [
+    ("abrupt", 0.3),
+    ("gradual", 0.4),
+    ("multi_switch", 0.3)
+]
+
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 # ============================
@@ -59,6 +60,26 @@ def load_image(path):
         path = PROJECT_ROOT / path
     return transform(Image.open(path).convert("RGB")).unsqueeze(0)
 
+# ============================
+# NEGATIVE GENERATORS
+# ============================
+def generate_abrupt_switch(genuine, impostor):
+    t = random.randint(SEQ_LEN // 4, 3 * SEQ_LEN // 4)
+    return np.concatenate([genuine[:t], impostor[t:]])
+
+def generate_gradual_drift(genuine, impostor):
+    alpha = np.linspace(0, 1, SEQ_LEN)
+    return (1 - alpha) * genuine + alpha * impostor
+
+def generate_multi_switch(genuine, impostor):
+    out = []
+    switch_every = random.randint(2, 6)
+    for i in range(SEQ_LEN):
+        if i % switch_every == 0:
+            out.append(impostor[i])
+        else:
+            out.append(genuine[i])
+    return np.array(out)
 
 # ============================
 # MAIN
@@ -78,8 +99,7 @@ def main():
 
     # -------- LOAD UC1 MODEL --------
     model = ResNetEmbedder(embedding_dim=256)
-    state_dict = torch.load(UC1_CKPT, map_location=device)
-    model.load_state_dict(state_dict)
+    model.load_state_dict(torch.load(UC1_CKPT, map_location=device))
     model = model.to(device)
     model.eval()
 
@@ -95,18 +115,16 @@ def main():
         identities = split_map[split]
 
         for identity in identities:
-            # -------- ENROLLMENT (SOURCE OF TRUTH) --------
-            enroll_rows = df[
+            # -------- ENROLLMENT --------
+            enroll_row = df[
                 (df.identity_id == identity) &
                 (df.role == "enrollment")
             ]
 
-            if len(enroll_rows) != 1:
-                continue  # safety guard
+            if len(enroll_row) != 1:
+                continue
 
-            enroll_path = enroll_rows.image_path.values[0]
-            enroll_img = load_image(enroll_path).to(device)
-
+            enroll_img = load_image(enroll_row.image_path.values[0]).to(device)
             with torch.no_grad():
                 enroll_emb = model(enroll_img).cpu().numpy()
 
@@ -119,71 +137,68 @@ def main():
             if len(probes) < SEQ_LEN:
                 continue
 
-            # -------- POSITIVE SEQUENCE --------
-            pos_scores = []
+            # -------- POSITIVE --------
+            genuine_scores = []
             for p in probes[:SEQ_LEN]:
                 img = load_image(p).to(device)
                 with torch.no_grad():
                     emb = model(img).cpu().numpy()
-                pos_scores.append(
-                    cosine_similarity(enroll_emb, emb)[0][0]
-                )
+                genuine_scores.append(cosine_similarity(enroll_emb, emb)[0][0])
 
-            all_sequences.append(
-                np.array(pos_scores, dtype=np.float32).reshape(SEQ_LEN, 1)
-            )
+            genuine_scores = np.array(genuine_scores, dtype=np.float32)
+
+            all_sequences.append(genuine_scores.reshape(SEQ_LEN, 1))
             all_labels.append(0)
 
-            # -------- NEGATIVE SEQUENCE (SINGLE SWITCH) --------
+            # -------- NEGATIVE --------
             other_ids = [i for i in identities if i != identity]
             if not other_ids:
                 continue
 
-            impostor = np.random.choice(other_ids)
+            impostor_id = random.choice(other_ids)
 
             imp_probes = df[
-                (df.identity_id == impostor) &
+                (df.identity_id == impostor_id) &
                 (df.role == "probe")
             ].image_path.tolist()
 
             if len(imp_probes) < SEQ_LEN:
                 continue
 
-            switch = np.random.randint(*SWITCH_RANGE)
-            neg_scores = []
-
-            for p in probes[:switch]:
+            impostor_scores = []
+            for p in imp_probes[:SEQ_LEN]:
                 img = load_image(p).to(device)
                 with torch.no_grad():
                     emb = model(img).cpu().numpy()
-                neg_scores.append(
-                    cosine_similarity(enroll_emb, emb)[0][0]
-                )
+                impostor_scores.append(cosine_similarity(enroll_emb, emb)[0][0])
 
-            for p in imp_probes[:SEQ_LEN - switch]:
-                img = load_image(p).to(device)
-                with torch.no_grad():
-                    emb = model(img).cpu().numpy()
-                neg_scores.append(
-                    cosine_similarity(enroll_emb, emb)[0][0]
-                )
+            impostor_scores = np.array(impostor_scores, dtype=np.float32)
 
-            all_sequences.append(
-                np.array(neg_scores, dtype=np.float32).reshape(SEQ_LEN, 1)
-            )
+            modes, probs = zip(*NEGATIVE_MODES)
+            mode = random.choices(modes, probs)[0]
+
+            if mode == "abrupt":
+                neg = generate_abrupt_switch(genuine_scores, impostor_scores)
+            elif mode == "gradual":
+                neg = generate_gradual_drift(genuine_scores, impostor_scores)
+            else:
+                neg = generate_multi_switch(genuine_scores, impostor_scores)
+
+            all_sequences.append(neg.reshape(SEQ_LEN, 1))
             all_labels.append(1)
 
     # ============================
-    # SAVE OUTPUTS
+    # SAVE OUTPUTS (v2)
     # ============================
-    all_sequences = np.array(all_sequences, dtype=np.float32)
-    all_labels = np.array(all_labels, dtype=np.int64)
+    X = np.array(all_sequences, dtype=np.float32)
+    y = np.array(all_labels, dtype=np.int64)
 
-    np.save("train_sequences.npy", all_sequences)
-    np.save("sequence_labels.npy", all_labels)
+    np.save("train_sequences_v2.npy", X)
+    np.save("sequence_labels_v2.npy", y)
 
-    print("✅ UC2 temporal sequences saved successfully")
-    print("Sequences shape:", all_sequences.shape)
+    print("✅ UC2 v2 sequences saved")
+    print("Shape:", X.shape)
+    print("Labels:", np.unique(y, return_counts=True))
 
 # ============================
 # ENTRY POINT
