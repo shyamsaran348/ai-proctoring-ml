@@ -96,20 +96,18 @@ class ProctoringEngine:
         # ---------------------------------------------------------
         # SAFETY CLAMP: Override GRU if Similarity is High
         # ---------------------------------------------------------
-        if uc1_sim_calibrated > 0.65:
-            # User is clearly present and matching.
-            # Force risk down significantly, but keep slight variance for liveness feel.
-            risk = 0.1
-            
-            # --- ADAPTIVE IDENTITY UPDATE ---
-            # If confidence is VERY high, update the reference embedding slightly.
-            # This helps the system adapt to changing lighting/angles over time.
-            if uc1_sim_calibrated > 0.85:
-                self.update_enrollment(probe_emb)
-
-        elif uc1_sim_calibrated > 0.5:
-             # Ambiguous zone, dampen the risk
-             risk = min(risk, 0.4)
+        # DISABLE CLAMP: Trust UC5 (Risk Fusion) even if ID matches.
+        # This prevents "Drifting" from being ignored just because the face features are similar.
+        # if uc1_sim_calibrated > 0.85:
+        #     risk = 0.1
+        # elif uc1_sim_calibrated > 0.75:
+        #      risk = min(risk, 0.4)
+        
+        # LOGGING: Print Sim Score for User Debugging
+        print(f"[Engine] Sim: {uc1_sim_calibrated:.4f} | Risk: {risk:.4f}")
+        
+        # Debug print for raw values
+        # print(f"[Engine] Sim: {uc1_sim_calibrated:.4f} | Risk: {risk:.4f}")
         
         return {
             "uc1_similarity": uc1_sim_calibrated,

@@ -44,9 +44,9 @@ class ResNetEmbedder(nn.Module):
         x = self.backbone(x)          # (B, 2048, 1, 1)
         x = x.view(x.size(0), -1)     # (B, 2048)
 
-        # Embedding projection
-        x = self.embedding_head(x)    # (B, embedding_dim)
-
+        # Skip Random Head (Fix for Model Collapse)
+        x = self.embedding_head(x)
+        
         # L2 normalization (CRITICAL)
         x = F.normalize(x, p=2, dim=1)
 

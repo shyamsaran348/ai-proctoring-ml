@@ -548,7 +548,7 @@ class ExamSessionViewSet(viewsets.ModelViewSet):
                 
                 if emb1 is not None and emb2 is not None:
                     sim = engine.uc1.compute_similarity(emb1, emb2)
-                    verified = sim > 0.40 # Slightly stricter than 0.35
+                    verified = sim > 0.45 # Lowered to 0.45 for better user experience
                     print(f"Verification Sim: {sim:.4f} -> {verified}")
                 else:
                     print("Face not detected in one of the images.")

@@ -108,6 +108,12 @@ class MLProctoringAdapter:
         # except Exception as e:
         #      print(f"[ML Adapter] Webcam init failed: {e}. Passive mode.")
 
+        print(f"[MLAdapter] Loading Reference Image from: {image_path}")
+        
+        # 2. Check if reference image exists
+        if not os.path.exists(image_path):
+            print(f"[ML Adapter] Webcam init failed: {e}. Passive mode.")
+
         print(f"[ML Adapter] Session Ready for {student_id}")
 
     def stop_monitoring(self):
@@ -148,7 +154,7 @@ class MLProctoringAdapter:
                 
                 if risk_score > 0.7:
                     status_text = f"HIGH RISK: {risk_score:.2f}"
-                elif sim_score < 0.4:
+                elif sim_score < 0.75:
                      status_text = f"Identity Mismatch: {sim_score:.2f}"
                 else:
                     status_text = f"Monitoring (Risk: {risk_score:.2f})"
@@ -291,8 +297,8 @@ class MLProctoringAdapter:
             elif looking_away:
                  status_text = "WARNING: LOOKING AWAY"
                  # Boost risk artificially if looking away
-                 self.latest_status['risk_score'] = max(risk_score, 0.8) 
-            elif sim_score < 0.4:
+                 self.latest_status['risk_score'] = max(risk_score, 0.85) 
+            elif sim_score < 0.50:
                  status_text = f"Identity Mismatch: {sim_score:.2f}"
             elif num_faces == 0:
                  status_text = "No Face Detected"

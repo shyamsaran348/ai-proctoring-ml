@@ -909,6 +909,7 @@
     // --- New Warning Timer Globals ---
     let warningTimer = null;
     let isWarningActive = false;
+    let noFaceStartTime = null; // Track "No Face" duration
     const WARNING_GRACE_PERIOD_MS = 2000;
 
 
@@ -1059,14 +1060,70 @@
           stream = s;
           video.srcObject = stream;
           status.innerText = "Ready to verify.";
+
+          // --- Lighting Check Loop ---
+          const lightingStatus = document.createElement('div');
+          lightingStatus.id = 'v-lighting';
+          lightingStatus.style.marginTop = '10px';
+          lightingStatus.style.fontWeight = 'bold';
+          lightingStatus.style.fontSize = '0.9rem';
+
+          // Safer insertion: use the button's own parent
+          if (btn && btn.parentNode) {
+            btn.parentNode.insertBefore(lightingStatus, btn);
+          }
+
+          const checkLighting = setInterval(() => {
+            // Ensure elements exist before drawing
+            if (video && video.readyState === 4 && canvas) {
+              try {
+                const ctx = canvas.getContext('2d');
+                canvas.width = 100; // Small size for speed
+                canvas.height = 100;
+                ctx.drawImage(video, 0, 0, 100, 100);
+                const frame = ctx.getImageData(0, 0, 100, 100);
+                const data = frame.data;
+                let r, g, b, avg;
+                let colorSum = 0;
+
+                for (let x = 0, len = data.length; x < len; x += 4) {
+                  r = data[x];
+                  g = data[x + 1];
+                  b = data[x + 2];
+                  avg = Math.floor((r + g + b) / 3);
+                  colorSum += avg;
+                }
+
+                const brightness = Math.floor(colorSum / (100 * 100));
+
+                if (brightness < 60) {
+                  lightingStatus.innerText = "⚠️ Lighting is too DARK. Please add more light.";
+                  lightingStatus.style.color = "#f59e0b"; // Orange
+                } else if (brightness > 200) {
+                  lightingStatus.innerText = "⚠️ Lighting is too BRIGHT. Avoid backlighting.";
+                  lightingStatus.style.color = "#f59e0b";
+                } else {
+                  lightingStatus.innerText = "✅ Lighting conditions are GOOD.";
+                  lightingStatus.style.color = "#10b981"; // Green
+                }
+              } catch (err) {
+                // Canvas security errors or other glitches shouldn't stop the flow
+                console.warn("Lighting check failed:", err);
+              }
+            }
+          }, 500);
+
+          // Helper to cleanup (not called automatically here, relies on verify success)
+
         }).catch(e => {
-          status.innerText = "Camera Access Denied";
+          console.error("Camera Init Error:", e);
+          status.innerText = "Error: " + (e.message || "Camera Access Denied");
           status.style.color = "red";
           btn.disabled = true;
         });
 
         btn.onclick = async () => {
-          btn.disabled = true;
+          btn.disabled = true; // Disable double clicks
           btn.innerText = "Verifying...";
           status.innerText = "Processing...";
           status.style.color = "var(--primary)";
@@ -1093,6 +1150,12 @@
               status.style.color = "var(--success)";
               setTimeout(() => {
                 if (stream) stream.getTracks().forEach(t => t.stop());
+                // Remove interval if exists (it sits in closure scope)
+                // We don't have direct handle here easily unless we move 'checkLighting' up. 
+                // But preventing memory leak:
+                const lightingEl = document.getElementById('v-lighting');
+                if (lightingEl) lightingEl.remove();
+
                 document.body.removeChild(overlay);
                 resolve(true);
               }, 1000);
@@ -1222,60 +1285,62 @@
           }
         }
 
-        // --- WARNING POPUP LOGIC (WITH DEBOUNCE) ---
+        // --- WARNING POPUP LOGIC (STRICT) ---
         const warningOverlay = document.getElementById('risk-warning-overlay');
         const warningMessageEl = document.getElementById('warning-reason');
 
         let shouldWarn = false;
         let msg = "";
 
-        // Condition 1: No Face
+        // Condition 1: No Face (With Grace Period)
         if (data.num_faces === 0) {
-          shouldWarn = true;
-          msg = "No Face Detected.<br>Please ensure your face is clearly visible in the camera frame.";
+          // Start timer if not started
+          if (!noFaceStartTime) {
+            noFaceStartTime = Date.now();
+          }
+          // Only warn if 3 seconds have passed
+          else if (Date.now() - noFaceStartTime > 3000) {
+            shouldWarn = true;
+            msg = "No Face Detected.<br>Please ensure your face is clearly visible in the camera frame.";
+          }
         }
-        // Condition 2: Multiple Faces
-        else if (data.num_faces > 1) {
-          shouldWarn = true;
-          msg = "Multiple Faces Detected.<br>Only one person is allowed during the exam. Please ask others to leave.";
-        }
-        // Condition 3: High Risk (Not looking at screen / looking away)
-        else if (data.risk_score > 0.75) { // Using 0.75 as per original checkRiskAndWarn
-          shouldWarn = true;
-          msg = "High Suspicious Activity.<br>Please maintain eye contact with the screen.";
-        } else if (data.uc1_identity_sim < 0.3) { // Using 0.3 as per original checkRiskAndWarn
-          shouldWarn = true;
-          msg = "Identity Verification Failed.<br>Face does not match profile.";
+        else {
+          // Reset timer immediately if face found
+          noFaceStartTime = null;
+
+          // Condition 2: Multiple Faces
+          if (data.num_faces > 1) {
+            shouldWarn = true;
+            msg = "Multiple Faces Detected.<br>Only one person is allowed during the exam.";
+          }
+          // Condition 3: Identity Mismatch (UC1) - STRICT CHECK
+          else if (data.uc1_identity_sim < 0.50) {
+            shouldWarn = true;
+            msg = `Identity Verification Failed.<br>Face does not match the session profile.`;
+          }
+          // Condition 4: High Risk (UC5)
+          else if (data.risk_score >= 0.75) {
+            shouldWarn = true;
+            msg = "High Suspicious Activity Detected.<br>Please focus on the screen.";
+          }
         }
 
         if (shouldWarn) {
-          // If checking for warning and NOT already active, start timer
-          if (!warningTimer && !isWarningActive) {
-            console.log("Violation detected. Starting grace timer...");
-            warningTimer = setTimeout(() => {
-              // This runs only if violation persists for 2 seconds
-              warningMessageEl.innerHTML = msg;
-              warningOverlay.style.display = 'flex';
-              isWarningActive = true;
-              warningTimer = null; // Timer finished
-            }, WARNING_GRACE_PERIOD_MS);
-          }
-          // If warning is ALREADY active, just update text (no timer needed)
-          if (isWarningActive) {
+          // Only update if the message has changed to prevent flickering
+          if (warningMessageEl.innerHTML !== msg) {
             warningMessageEl.innerHTML = msg;
+          }
+          // Only touch display if not already visible
+          if (warningOverlay.style.display !== 'flex') {
             warningOverlay.style.display = 'flex';
           }
+          isWarningActive = true;
         } else {
-          // SAFE STATE: Clear everything immediately
-          if (warningTimer) {
-            clearTimeout(warningTimer);
-            warningTimer = null;
-            console.log("Violation cleared before grace period ended.");
-          }
-          if (isWarningActive) {
+          // Clear Warning
+          if (warningOverlay.style.display !== 'none') {
             warningOverlay.style.display = 'none';
-            isWarningActive = false;
           }
+          isWarningActive = false;
         }
         // ---------------------------
 

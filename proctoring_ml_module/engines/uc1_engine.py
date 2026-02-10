@@ -22,7 +22,7 @@ class UC1Engine:
         self.embedding_dim = config['models']['uc1'].get('embedding_dim', 256)
         
         # Initialize model
-        self.model = ResNetEmbedder(embedding_dim=self.embedding_dim, pretrained=False)
+        self.model = ResNetEmbedder(embedding_dim=self.embedding_dim, pretrained=True)
         self.load_weights()
         self.model.to(self.device)
         self.model.eval()
