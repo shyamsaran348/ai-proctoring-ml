@@ -1,0 +1,33 @@
+Phase 15 — Complexity & Latency Analysis
+==================================================
+
+UC1 (ResNet-50 Embedder)
+  Parameters : 24.03M
+  File Size  : N/A
+  Latency    : 47.746 ± 16.260 ms
+
+UC2 (Temporal LSTM)
+  Parameters : 50.5K
+  File Size  : N/A
+  Latency    : 2.907 ± 0.236 ms
+
+UC3 (Bi-LSTM Presence)
+  Parameters : 136.3K
+  File Size  : N/A
+  Latency    : 6.133 ± 1.660 ms
+
+UC4 (Bi-LSTM Drift)
+  Parameters : 791.8K
+  File Size  : N/A
+  Latency    : 16.445 ± 2.473 ms
+
+UC5 (GRU Risk Fusion)
+  Parameters : 3.7K
+  File Size  : N/A
+  Latency    : 2.969 ± 0.332 ms
+
+TOTAL
+  Parameters : 25.02M
+  File Size  : 0.00 MB
+  Latency    : 76.200 ms per frame
+  Load Factor: 2.286x (threshold: 1.0 for 30fps)

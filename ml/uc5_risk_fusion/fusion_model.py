@@ -17,7 +17,7 @@ class RiskFusionGRU(nn.Module):
                     final session-level cheating risk (logit)
     """
 
-    def __init__(self, input_dim=2, hidden_dim=32):
+    def __init__(self, input_dim=4, hidden_dim=32):
         super().__init__()
 
         self.hidden_dim = hidden_dim

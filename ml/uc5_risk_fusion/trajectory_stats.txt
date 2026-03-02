@@ -1,0 +1,33 @@
+Phase 14 — Risk Trajectory Analysis
+==================================================
+
+Genuine
+  Final Risk  : 0.0009
+  Avg Gradient: -0.003485
+  Smoothness  : 0.9887
+  Peak Frame  : 0
+
+Abrupt Impersonation
+  Final Risk  : 0.9993
+  Avg Gradient: +0.004862
+  Smoothness  : 0.9713
+  Peak Frame  : 119
+
+Sophisticated Drift
+  Final Risk  : 0.998
+  Avg Gradient: +0.004668
+  Smoothness  : 0.9744
+  Peak Frame  : 119
+
+Presence Absence
+  Final Risk  : 0.9854
+  Avg Gradient: +0.004740
+  Smoothness  : 0.9741
+  Peak Frame  : 87
+
+Flickering
+  Final Risk  : 0.9967
+  Avg Gradient: +0.004180
+  Smoothness  : 0.9869
+  Peak Frame  : 119
+

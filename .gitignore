@@ -3,7 +3,11 @@ ml/data/raw/
 ml/data/processed/
 ml/data/sequences/
 ml/data/synthetic/
+ml/data/uc3_raw/
 
+# ---- LARGE GENERATED DATASETS (>100MB, exceed GitHub limit) ----
+ml/uc4_drift/datasets/uc4_drift_sequences.npy
+ml/uc4_drift/datasets/vggface2_embeddings.npy
 # ---- MODEL OUTPUTS ----
 *.pth
 *.pt

@@ -1,0 +1,7 @@
+Phase 10 Signal Importance Ablation
+
+Full Structure (4-Signals): 1.0000
+No Identity (Sub UC1): 1.0000
+No Instability (Sub UC2): 1.0000
+No Presence (Sub UC3): 1.0000
+No Drift Tracking (Sub UC4): 1.0000

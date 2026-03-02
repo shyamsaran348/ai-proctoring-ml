@@ -1,0 +1,24 @@
+Phase 13 — Calibration & Reliability Results
+==================================================
+
+Temporal GRU
+  ECE         : 0.0072
+  Brier Total : 0.0126
+  Reliability : 0.0015
+  Resolution  : 0.2384
+  Uncertainty : 0.2500
+
+Non-Temporal MLP
+  ECE         : 0.0171
+  Brier Total : 0.0191
+  Reliability : 0.0015
+  Resolution  : 0.2316
+  Uncertainty : 0.2500
+
+Mean+LogReg
+  ECE         : 0.0083
+  Brier Total : 0.0330
+  Reliability : 0.0002
+  Resolution  : 0.2169
+  Uncertainty : 0.2500
+

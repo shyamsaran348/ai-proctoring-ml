@@ -34,7 +34,7 @@ class RiskDataset(Dataset):
 # LOAD DATA
 # ============================================================
 
-X = np.load(DATASET_DIR / "risk_sequences.npy")   # (B, 120, 2)
+X = np.load(DATASET_DIR / "risk_sequences.npy")   # (B, 120, 4)
 y = np.load(DATASET_DIR / "risk_labels.npy")      # (B,)
 
 dataset = RiskDataset(X, y)
@@ -46,7 +46,7 @@ loader = DataLoader(dataset, batch_size=4, shuffle=True)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-model = RiskFusionGRU(input_dim=2, hidden_dim=32).to(device)
+model = RiskFusionGRU(input_dim=4, hidden_dim=32).to(device)
 
 criterion = nn.BCEWithLogitsLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)

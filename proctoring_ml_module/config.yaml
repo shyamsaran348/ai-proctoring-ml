@@ -1,3 +1,4 @@
+model_dir: "proctoring_ml_module/models"
 models:
   uc1:
     path: "proctoring_ml_module/models/uc1_resnet_embedder.pth"

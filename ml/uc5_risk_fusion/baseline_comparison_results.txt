@@ -1,0 +1,28 @@
+Phase 12 — Baseline Comparison Results
+==================================================
+
+B1: Threshold Rule
+  ROC-AUC : 0.8212  (vs GRU: +0.1775)
+  PR-AUC  : 0.8532  (vs GRU: +0.1457)
+  Brier   : 0.3447
+
+B2: Mean+LogReg
+  ROC-AUC : 0.9900  (vs GRU: +0.0087)
+  PR-AUC  : 0.9918  (vs GRU: +0.0070)
+  Brier   : 0.0330
+
+B3: Non-Temporal MLP
+  ROC-AUC : 0.9969  (vs GRU: +0.0018)
+  PR-AUC  : 0.9972  (vs GRU: +0.0016)
+  Brier   : 0.0191
+
+B4: Last-Frame LogReg
+  ROC-AUC : 0.8236  (vs GRU: +0.1751)
+  PR-AUC  : 0.8594  (vs GRU: +0.1394)
+  Brier   : 0.1662
+
+B5: Temporal GRU (Ours)
+  ROC-AUC : 0.9987  (vs GRU: +0.0000)
+  PR-AUC  : 0.9988  (vs GRU: +0.0000)
+  Brier   : 0.0126
+
