@@ -260,10 +260,6 @@ def fig4_calibration():
 # ──────────────────────────────────────────────────────────────────────────────
 # Figure 5 — System Architecture Diagram
 # ──────────────────────────────────────────────────────────────────────────────
-def fig5_architecture():
-    fig, ax = plt.subplots(figsize=(12, 7))
-    ax.axis('off')
-
     def draw_box(ax, x, y, w, h, label, sublabel='', color='#4f46e5', text_color='white', fontsize=11):
         rect = plt.Rectangle((x, y), w, h, facecolor=color, edgecolor='white',
                               linewidth=1.5, zorder=3, alpha=0.92)
@@ -350,6 +346,5 @@ if __name__ == '__main__':
     fig2_baselines()
     fig3_trajectories()
     fig4_calibration()
-    fig5_architecture()
     print('──────────────────────────')
     print(f'All figures saved to: {OUT_DIR}')
