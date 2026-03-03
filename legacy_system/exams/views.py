@@ -651,7 +651,26 @@ class ExamSessionViewSet(viewsets.ModelViewSet):
                  return Response(proctor.latest_status)
         
         return Response({'status': 'ignored'}, status=200)
-        
+
+    @action(detail=True, methods=['get'])
+    def risk_history(self, request, session_id=None):
+        """
+        Returns the full per-frame risk trajectory for this session.
+        Used by the frontend sparkline in the proctoring widget.
+        Response: { history: [{timestamp, risk, uc1, uc2, uc3, uc4}, ...] }
+        """
+        try:
+            self.get_object()
+        except Exception:
+            return Response({'error': 'Session not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        proctor = PROCTORING_INSTANCES.get(session_id)
+        if proctor and hasattr(proctor, 'get_risk_history'):
+            history = proctor.get_risk_history()
+            # Return last 150 points max to keep payloads small
+            return Response({'history': history[-150:]})
+        return Response({'history': []})
+
 def index(request):
     return render(request, 'ind.html')
 

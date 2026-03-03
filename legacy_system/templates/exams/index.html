@@ -495,6 +495,92 @@
       border-top: 1px solid #fef3c7;
     }
 
+    /* ── Signal Bars Panel ───────────────────────────── */
+    .signal-panel {
+      padding: 10px 14px 8px;
+      background: #f8fafc;
+      border-top: 1px solid var(--border);
+    }
+
+    .signal-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .signal-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      width: 78px;
+      flex-shrink: 0;
+      letter-spacing: 0.03em;
+    }
+
+    .signal-track {
+      flex: 1;
+      height: 5px;
+      background: #e2e8f0;
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    .signal-fill {
+      height: 100%;
+      border-radius: 99px;
+      width: 0%;
+      transition: width 0.5s ease, background 0.3s ease;
+    }
+
+    .signal-val {
+      font-size: 10px;
+      font-family: var(--font-code);
+      color: var(--text-secondary);
+      width: 36px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    /* Sparkline container */
+    .sparkline-wrap {
+      padding: 6px 14px 10px;
+      background: #f8fafc;
+    }
+
+    .sparkline-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 3px;
+      letter-spacing: 0.03em;
+    }
+
+    .risk-badge {
+      display: inline-block;
+      padding: 1px 7px;
+      border-radius: 99px;
+      font-size: 10px;
+      font-weight: 700;
+      margin-left: 8px;
+      transition: background 0.3s;
+    }
+
+    .risk-badge.low {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .risk-badge.medium {
+      background: #fef9c3;
+      color: #854d0e;
+    }
+
+    .risk-badge.high {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
     /* Verification Modal (Redesign) */
     .modal-overlay {
       position: fixed;
@@ -851,6 +937,57 @@
         <!-- Webcam Feed Injected Here -->
         <canvas id="proctor-canvas"></canvas>
       </div>
+
+      <!-- ── ML Signal Bars ──────────────────────────────── -->
+      <div class="signal-panel" id="signal-panel">
+        <!-- UC1 Identity Similarity -->
+        <div class="signal-row">
+          <span class="signal-label">UC1 Identity</span>
+          <div class="signal-track">
+            <div class="signal-fill" id="bar-uc1" style="background:#4f46e5;"></div>
+          </div>
+          <span class="signal-val" id="val-uc1">—</span>
+        </div>
+        <!-- UC2 Instability -->
+        <div class="signal-row">
+          <span class="signal-label">UC2 Instability</span>
+          <div class="signal-track">
+            <div class="signal-fill" id="bar-uc2" style="background:#f59e0b;"></div>
+          </div>
+          <span class="signal-val" id="val-uc2">—</span>
+        </div>
+        <!-- UC3 Presence -->
+        <div class="signal-row">
+          <span class="signal-label">UC3 Presence</span>
+          <div class="signal-track">
+            <div class="signal-fill" id="bar-uc3" style="background:#10b981;"></div>
+          </div>
+          <span class="signal-val" id="val-uc3">—</span>
+        </div>
+        <!-- UC4 Drift -->
+        <div class="signal-row">
+          <span class="signal-label">UC4 Drift</span>
+          <div class="signal-track">
+            <div class="signal-fill" id="bar-uc4" style="background:#ef4444;"></div>
+          </div>
+          <span class="signal-val" id="val-uc4">—</span>
+        </div>
+      </div>
+
+      <!-- ── Risk Sparkline ──────────────────────────────── -->
+      <div class="sparkline-wrap" id="sparkline-wrap">
+        <div style="display:flex; align-items:center; margin-bottom:4px;">
+          <span class="sparkline-label">Risk Trajectory</span>
+          <span class="risk-badge low" id="risk-badge">LOW</span>
+          <span style="margin-left:auto; font-family:var(--font-code); font-size:11px;" id="risk-val">0.0000</span>
+        </div>
+        <svg id="sparkline-svg" width="100%" height="32" viewBox="0 0 272 32" preserveAspectRatio="none"
+          style="display:block;">
+          <polyline id="sparkline-line" points="" fill="none" stroke="#4f46e5" stroke-width="1.5"
+            stroke-linejoin="round" stroke-linecap="round" />
+        </svg>
+      </div>
+
       <div id="proctoring-warnings" class="proctor-warnings">
         <!-- Warnings appear here -->
       </div>
@@ -860,24 +997,28 @@
     <div id="proctor-help-overlay" class="modal-overlay" style="display:none; z-index:9999;">
       <div class="modal" style="max-width: 400px; text-align: left;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-          <h3 style="margin:0;">Proctoring Metrics</h3>
+          <h3 style="margin:0;">Proctoring Signals</h3>
           <button onclick="toggleProctorHelp()"
             style="background:none; border:none; font-size:20px; cursor:pointer;">&times;</button>
         </div>
         <ul style="border-left: 3px solid var(--primary); padding-left: 12px; list-style:none; line-height:1.6;">
           <li style="margin-bottom:10px;">
-            <strong>ID (0.0 - 1.0):</strong> Identity Match.<br>
-            <span style="font-size:12px; color:var(--text-secondary);">How much you look like your profile photo. Should
-              be > 0.6.</span>
+            <strong>UC1 Identity (↑ good):</strong> Cosine similarity between current frame and enrollment embedding.
+            Should stay > 0.6.
           </li>
           <li style="margin-bottom:10px;">
-            <strong>S (0.0 - 1.0):</strong> Stability Score.<br>
-            <span style="font-size:12px; color:var(--text-secondary);">Lower is better. High score means excessive
-              movement.</span>
+            <strong>UC2 Instability (↓ good):</strong> Temporal pattern of identity switches. High value indicates
+            suspicious substitution.
+          </li>
+          <li style="margin-bottom:10px;">
+            <strong>UC3 Presence (↑ good):</strong> Attentiveness model — face confidence, head pose, motion energy.
+          </li>
+          <li style="margin-bottom:10px;">
+            <strong>UC4 Drift (↓ good):</strong> Long-horizon drift detector across 120 frames. Catches slow
+            substitution.
           </li>
           <li>
-            <strong>R (0.0 - 1.0):</strong> Total Risk Score.<br>
-            <span style="font-size:12px; color:var(--text-secondary);">0.1 is Safe. > 0.7 is High Risk.</span>
+            <strong>Risk Score:</strong> GRU-fused session risk ∈ [0,1]. Low &lt; 0.3, Medium 0.3–0.7, High &gt; 0.7.
           </li>
         </ul>
       </div>
@@ -1285,7 +1426,55 @@
           }
         }
 
+        // ── Update ML Signal Bars ─────────────────────────────────────────
+        const setBar = (id, valId, pct) => {
+          const fill = document.getElementById(id);
+          const val = document.getElementById(valId);
+          if (fill) fill.style.width = Math.min(100, Math.max(0, pct * 100)).toFixed(1) + '%';
+          if (val) val.textContent = pct.toFixed(3);
+        };
+        const uc1 = data.uc1_identity_sim || 0;
+        const uc2 = data.uc2_instability || 0;
+        const uc3 = data.uc3_presence ?? 0.5;
+        const uc4 = data.uc4_drift || 0;
+        const risk = data.risk_score || 0;
+
+        setBar('bar-uc1', 'val-uc1', uc1);
+        setBar('bar-uc2', 'val-uc2', uc2);
+        setBar('bar-uc3', 'val-uc3', uc3);
+        setBar('bar-uc4', 'val-uc4', uc4);
+
+        // Color-code UC1 bar by value
+        const uc1Fill = document.getElementById('bar-uc1');
+        if (uc1Fill) uc1Fill.style.background = uc1 < 0.5 ? '#ef4444' : uc1 < 0.65 ? '#f59e0b' : '#4f46e5';
+
+        // UC5 risk sparkline (rolling 20-point buffer, max risk values)
+        if (!window._riskHistory) window._riskHistory = [];
+        window._riskHistory.push(risk);
+        if (window._riskHistory.length > 20) window._riskHistory.shift();
+
+        const W = 272, H = 32;
+        const pts = window._riskHistory;
+        const step = W / Math.max(pts.length - 1, 1);
+        const polyEl = document.getElementById('sparkline-line');
+        if (polyEl && pts.length > 1) {
+          const points = pts.map((v, i) => `${(i * step).toFixed(1)},${(H - v * H).toFixed(1)}`).join(' ');
+          polyEl.setAttribute('points', points);
+          polyEl.setAttribute('stroke', risk > 0.7 ? '#ef4444' : risk > 0.3 ? '#f59e0b' : '#4f46e5');
+        }
+
+        // Risk badge
+        const badge = document.getElementById('risk-badge');
+        const riskValEl = document.getElementById('risk-val');
+        if (badge) {
+          badge.className = 'risk-badge ' + (risk > 0.7 ? 'high' : risk > 0.3 ? 'medium' : 'low');
+          badge.textContent = risk > 0.7 ? 'HIGH' : risk > 0.3 ? 'MED' : 'LOW';
+        }
+        if (riskValEl) riskValEl.textContent = risk.toFixed(4);
+        // ─────────────────────────────────────────────────────────────────
+
         // --- WARNING POPUP LOGIC (STRICT) ---
+
         const warningOverlay = document.getElementById('risk-warning-overlay');
         const warningMessageEl = document.getElementById('warning-reason');
 
