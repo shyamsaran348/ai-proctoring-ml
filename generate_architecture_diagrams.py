@@ -250,13 +250,13 @@ def fig7_workflow():
     
     # Draw Background Phase Zones
     ax.add_patch(mpatches.Rectangle((0.5, 11.2), 9, 2.5, fill=True, facecolor='#f4f4f4', edgecolor='none', zorder=0))
-    ax.text(1.0, 13.4, "Phase 1: Enrollment", fontsize=10, fontweight='bold', color='#555555')
+    ax.text(0.7, 13.5, "Phase 1: Enrollment", fontsize=10, fontweight='bold', color='#555555', ha='left', va='top')
     
     ax.add_patch(mpatches.Rectangle((0.5, 3.2), 9, 7.8, fill=True, facecolor='#fdfdfd', edgecolor='none', zorder=0))
-    ax.text(1.0, 10.7, "Phase 2: Live Monitoring", fontsize=10, fontweight='bold', color='#555555')
+    ax.text(0.7, 10.8, "Phase 2: Live Monitoring", fontsize=10, fontweight='bold', color='#555555', ha='left', va='top')
     
     ax.add_patch(mpatches.Rectangle((0.5, 0.5), 9, 2.5, fill=True, facecolor='#f4f4f4', edgecolor='none', zorder=0))
-    ax.text(1.0, 2.7, "Phase 3: Session End", fontsize=10, fontweight='bold', color='#555555')
+    ax.text(0.7, 2.8, "Phase 3: Session End", fontsize=10, fontweight='bold', color='#555555', ha='left', va='top')
     
     # Nodes
     draw_oval(ax, cx, 13.0, 2.0, 0.6, "Session Start")
