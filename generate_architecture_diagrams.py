@@ -241,21 +241,21 @@ def fig6_architecture():
 # FIG 7: WORKFLOW (Formal Flowchart)
 # ════════════════════════════════════════════════════════════════════════════
 def fig7_workflow():
-    fig, ax = plt.subplots(figsize=(7, 10))
-    ax.set_xlim(0, 10)
+    fig, ax = plt.subplots(figsize=(7.5, 10))
+    ax.set_xlim(0, 10.5)
     ax.set_ylim(0, 14)
     ax.axis('off')
     
-    cx = 5.0
+    cx = 5.5
     
     # Draw Background Phase Zones
-    ax.add_patch(mpatches.Rectangle((0.5, 11.2), 9, 2.5, fill=True, facecolor='#f4f4f4', edgecolor='none', zorder=0))
+    ax.add_patch(mpatches.Rectangle((0.5, 11.2), 9.5, 2.5, fill=True, facecolor='#f4f4f4', edgecolor='none', zorder=0))
     ax.text(0.7, 13.5, "Phase 1: Enrollment", fontsize=10, fontweight='bold', color='#555555', ha='left', va='top')
     
-    ax.add_patch(mpatches.Rectangle((0.5, 3.2), 9, 7.8, fill=True, facecolor='#fdfdfd', edgecolor='none', zorder=0))
+    ax.add_patch(mpatches.Rectangle((0.5, 3.2), 9.5, 7.8, fill=True, facecolor='#fdfdfd', edgecolor='none', zorder=0))
     ax.text(0.7, 10.8, "Phase 2: Live Monitoring", fontsize=10, fontweight='bold', color='#555555', ha='left', va='top')
     
-    ax.add_patch(mpatches.Rectangle((0.5, 0.5), 9, 2.5, fill=True, facecolor='#f4f4f4', edgecolor='none', zorder=0))
+    ax.add_patch(mpatches.Rectangle((0.5, 0.5), 9.5, 2.5, fill=True, facecolor='#f4f4f4', edgecolor='none', zorder=0))
     ax.text(0.7, 2.8, "Phase 3: Session End", fontsize=10, fontweight='bold', color='#555555', ha='left', va='top')
     
     # Nodes
@@ -286,11 +286,11 @@ def fig7_workflow():
     orth_arrow(ax, (cx, 4.9), (cx, 4.6))
     
     # No branch (Loops back)
-    pth = [(cx + 1.25, 4.1), (8.5, 4.1), (8.5, 10.0), (cx + 1.0, 10.0)]
+    pth = [(cx + 1.25, 4.1), (9.0, 4.1), (9.0, 10.0), (cx + 1.0, 10.0)]
     x, y = zip(*pth)
     ax.plot(x, y, color='black', lw=1.2, zorder=2)
     ax.annotate('', xy=(cx + 1.0, 10.0), xytext=(cx + 1.1, 10.0), arrowprops=dict(arrowstyle='->', color='black', mutation_scale=10))
-    ax.text(8.5, 7.0, "No", ha='left', va='center', fontsize=9, fontweight='bold', bbox=dict(facecolor='white', edgecolor='none', pad=2))
+    ax.text(9.0, 7.0, "No", ha='left', va='center', fontsize=9, fontweight='bold', bbox=dict(facecolor='white', edgecolor='none', pad=2))
     
     # Yes branch
     orth_arrow(ax, (cx, 3.6), (cx, 2.3))
