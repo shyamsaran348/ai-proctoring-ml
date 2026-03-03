@@ -1,403 +1,335 @@
 """
-generate_architecture_diagrams.py
-==================================
-Generates two IEEE-style figures for the AI Proctoring research paper:
+generate_architecture_diagrams.py  (v2 — IEEE Clean Style)
+============================================================
+Generates two clean, IEEE-style block diagrams:
 
-  fig6_system_architecture.png  — Technical architecture (UC1–UC5 data flow)
-  fig7_workflow.png             — Conceptual phase-by-phase workflow
+  fig6_system_architecture.png  — Technical architecture
+  fig7_workflow.png             — Conceptual workflow
 
-Output: paper_figures/
-Run:    python3 generate_architecture_diagrams.py
+Style: white fill, black borders, gray arrows, no colors.
+Run:   python3 generate_architecture_diagrams.py
 """
 
 import os
-import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-from matplotlib.patches import FancyBboxPatch, FancyArrowPatch
+from matplotlib.patches import FancyArrowPatch
+
+plt.rcParams.update({
+    'font.family':        'DejaVu Sans',
+    'font.size':          9,
+    'savefig.dpi':        300,
+    'savefig.bbox':       'tight',
+    'savefig.pad_inches': 0.15,
+})
 
 OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'paper_figures')
 os.makedirs(OUT_DIR, exist_ok=True)
 
-# ── Shared Style ────────────────────────────────────────────────────────────
-plt.rcParams.update({
-    'font.family':    'DejaVu Sans',
-    'font.size':      9,
-    'savefig.dpi':    300,
-    'savefig.bbox':   'tight',
-    'savefig.pad_inches': 0.15,
-})
+# ── helpers ──────────────────────────────────────────────────────────────────
 
-# Clean monochrome palette (IEEE-friendly)
-C_DARK   = '#1a1a2e'   # near-black for text / heavy lines
-C_MID    = '#374151'   # module box fill
-C_LIGHT  = '#f9fafb'   # light box fill
-C_BORDER = '#6b7280'   # box border
-C_ACCENT = '#1d4ed8'   # blue for key data-flow arrows
-C_NOTE   = '#dc2626'   # red for invariant annotations
-C_ENROLL = '#14532d'   # dark-green for enrollment boxes
-C_PHASE  = '#1e3a5f'   # phase header boxes
-
-# ── Helper: draw a rounded-rect box with centred text ───────────────────────
-def box(ax, cx, cy, w, h, text, fontsize=8.5, fc='#374151', ec='#6b7280',
-        tc='white', lw=1.2, bold=False, style='round,pad=0.1',
-        linestyle='solid'):
-    bp = FancyBboxPatch(
-        (cx - w / 2, cy - h / 2), w, h,
-        boxstyle=style,
+def box(ax, cx, cy, w, h, lines, fontsize=8.5, bold_first=False,
+        lw=1.0, ls='solid', fc='white', ec='black'):
+    """Draw a plain white rectangle with centred text (supports multi-line)."""
+    rect = mpatches.FancyBboxPatch(
+        (cx - w/2, cy - h/2), w, h,
+        boxstyle='square,pad=0',
         facecolor=fc, edgecolor=ec,
-        linewidth=lw, linestyle=linestyle,
-        zorder=3,
-    )
-    ax.add_patch(bp)
-    weight = 'bold' if bold else 'normal'
-    for i, line in enumerate(text.split('\n')):
-        n = len(text.split('\n'))
-        offset = (n - 1) / 2 * 0.095 - i * 0.095
+        linewidth=lw, linestyle=ls, zorder=3)
+    ax.add_patch(rect)
+    if isinstance(lines, str):
+        lines = [lines]
+    n = len(lines)
+    for i, line in enumerate(lines):
+        offset = ((n - 1) / 2 - i) * (h / (n + 1))
+        weight = 'bold' if (bold_first and i == 0) else 'normal'
         ax.text(cx, cy + offset, line,
-                ha='center', va='center', fontsize=fontsize,
-                color=tc, fontweight=weight, zorder=4)
+                ha='center', va='center',
+                fontsize=fontsize, fontweight=weight, zorder=4)
 
 
-def arr(ax, x1, y1, x2, y2, color=C_ACCENT, lw=1.4,
-        label='', label_side='right', arrowstyle='->', head_w=8):
+def arrow(ax, x1, y1, x2, y2, lw=1.1, label='', lpos='right'):
+    """Draw a simple annotate-arrow."""
     ax.annotate('', xy=(x2, y2), xytext=(x1, y1),
-                arrowprops=dict(
-                    arrowstyle=arrowstyle,
-                    color=color, lw=lw,
-                    mutation_scale=head_w,
-                    connectionstyle='arc3,rad=0.0',
-                ),
+                arrowprops=dict(arrowstyle='->', color='black',
+                                lw=lw, mutation_scale=9),
                 zorder=2)
     if label:
-        mx, my = (x1 + x2) / 2, (y1 + y2) / 2
-        dx = 0.06 if label_side == 'right' else -0.06
-        ax.text(mx + dx, my, label,
-                ha='left' if label_side == 'right' else 'right',
-                va='center', fontsize=7.2, color=C_DARK,
-                style='italic', zorder=5)
+        mx, my = (x1+x2)/2, (y1+y2)/2
+        dx = 0.05 if lpos == 'right' else -0.05
+        ax.text(mx+dx, my, label, ha='left' if lpos=='right' else 'right',
+                va='center', fontsize=7.5, style='italic', color='#333333', zorder=5)
 
 
-def separator(ax, y, xmin, xmax, label='', lc='#d1d5db'):
-    ax.plot([xmin, xmax], [y, y], color=lc, lw=0.8, linestyle='--', zorder=1)
-    if label:
-        ax.text(xmin + 0.01, y + 0.015, label,
-                fontsize=7, color=C_BORDER, ha='left', va='bottom')
+def dblarrow(ax, x1, y1, x2, y2, lw=1.1):
+    ax.annotate('', xy=(x2, y2), xytext=(x1, y1),
+                arrowprops=dict(arrowstyle='<->', color='black',
+                                lw=lw, mutation_scale=9),
+                zorder=2)
+
+
+def hline(ax, y, x0, x1, lw=0.7, ls='--'):
+    ax.plot([x0, x1], [y, y], color='#aaaaaa', lw=lw, linestyle=ls, zorder=1)
 
 
 # ════════════════════════════════════════════════════════════════════════════
-# FIGURE 6 — System Architecture (Technical View)
+# FIG 6: SYSTEM ARCHITECTURE  (two-column block style)
 # ════════════════════════════════════════════════════════════════════════════
 def fig6_architecture():
-    fig, ax = plt.subplots(figsize=(11, 9))
-    ax.set_xlim(0, 1)
-    ax.set_ylim(0, 1)
+    W, H = 10, 11
+    fig, ax = plt.subplots(figsize=(W/1.1, H/1.1))
+    ax.set_xlim(0, W)
+    ax.set_ylim(0, H)
     ax.axis('off')
     fig.patch.set_facecolor('white')
 
-    # ── Title ────────────────────────────────────────────────────────
-    ax.text(0.5, 0.975, 'System Architecture — Multi-Signal Probabilistic Risk Accumulation Engine',
-            ha='center', va='top', fontsize=11, fontweight='bold', color=C_DARK)
+    ax.text(W/2, H - 0.18,
+            'System Architecture: Multi-Signal Temporal Risk Accumulation Engine',
+            ha='center', va='top', fontsize=10, fontweight='bold')
 
-    # ── Separators / zones ───────────────────────────────────────────
-    separator(ax, 0.845, 0.02, 0.98, label='— ENROLLMENT PHASE (executed once) —')
-    separator(ax, 0.60,  0.02, 0.98, label='— PER-FRAME PROCESSING (each frame fₜ) —')
-    separator(ax, 0.285, 0.02, 0.98, label='— TEMPORAL MODELING —')
-    separator(ax, 0.12,  0.02, 0.98, label='— RISK FUSION —')
+    # ── Layout constants ─────────────────────────────────────────────
+    # Two columns
+    Lx, Rx = 2.5, 7.5   # left col center, right col center
+    bw, bh  = 3.6, 0.62  # default box width / height
 
-    # ── ENROLLMENT ───────────────────────────────────────────────────
-    box(ax, 0.50, 0.920, 0.22, 0.070,
-        'Enrollment Image\n(captured once)', fc=C_ENROLL, ec='#166534',
-        fontsize=8.5, bold=True)
+    # ── Left column: ENROLLMENT PATH ────────────────────────────────
+    # zone label
+    ax.text(Lx, H-0.55, 'Enrollment (one-shot)', ha='center',
+            fontsize=8, style='italic', color='#555555')
+    hline(ax, H-0.65, 0.3, 4.7)
 
-    box(ax, 0.50, 0.855, 0.24, 0.055,
-        'ResNet-50 Embedder  (shared weights)', fc='#1e3a5f', ec='#1d4ed8',
-        fontsize=8)
+    L1y = H - 1.2
+    box(ax, Lx, L1y, bw, bh, 'Enrollment Image  f_enroll')
+    arrow(ax, Lx, L1y - bh/2, Lx, L1y - bh/2 - 0.35)
 
-    # enrollment embedding — wide, highlighted
-    box(ax, 0.50, 0.790, 0.44, 0.060,
-        'e₀  —  Immutable One-Shot Enrollment Embedding  (L2-normalised, 256-dim)',
-        fc='#7f1d1d', ec=C_NOTE, fontsize=8.5, bold=True, lw=1.6)
+    L2y = L1y - bh - 0.35
+    box(ax, Lx, L2y, bw, bh, 'ResNet-50 Feature Extractor  (UC1)')
+    arrow(ax, Lx, L2y - bh/2, Lx, L2y - bh/2 - 0.35)
 
-    # annotation: invariant
-    ax.text(0.96, 0.790,
-            '← Never updated\n   Never averaged\n   Never thresholded',
-            ha='left', va='center', fontsize=7, color=C_NOTE,
-            style='italic', zorder=5)
+    L3y = L2y - bh - 0.35
+    box(ax, Lx, L3y, bw, bh,
+        ['e\u2080  \u2014  Enrollment Embedding',
+         '(256-dim, L2-norm, immutable)'],
+        lw=1.6, bold_first=True)
 
-    arr(ax, 0.50, 0.885, 0.50, 0.865)
-    arr(ax, 0.50, 0.832, 0.50, 0.822)
+    # dashed border annotation
+    ax.text(Lx, L3y - bh/2 - 0.22, '\u2014 never updated, never thresholded \u2014',
+            ha='center', fontsize=7.5, style='italic', color='#555555')
 
-    # ── PER-FRAME PROCESSING ─────────────────────────────────────────
-    box(ax, 0.18, 0.720, 0.20, 0.060,
-        'Live Frame  fₜ\n(webcam input)', fc=C_ENROLL, ec='#166534', fontsize=8)
+    # ── Right column: PER-FRAME PATH ─────────────────────────────────
+    ax.text(Rx, H-0.55, 'Per-Frame Processing  (t = 1 \u2026 T)', ha='center',
+            fontsize=8, style='italic', color='#555555')
+    hline(ax, H-0.65, 5.3, 9.7)
 
-    box(ax, 0.18, 0.648, 0.24, 0.055,
-        'ResNet-50 Embedder  (shared weights)', fc='#1e3a5f', ec='#1d4ed8', fontsize=8)
+    R1y = H - 1.2
+    box(ax, Rx, R1y, bw, bh, 'Live Frame  f\u209c  (webcam input)')
+    arrow(ax, Rx, R1y - bh/2, Rx, R1y - bh/2 - 0.35)
 
-    box(ax, 0.18, 0.615, 0.18, 0.036,
-        'eₜ  (probe embedding)', fc='#1e3a5f', ec='#1d4ed8',
-        fontsize=7.5, bold=False)
+    R2y = R1y - bh - 0.35
+    box(ax, Rx, R2y, bw, bh, 'ResNet-50 Feature Extractor  (UC1)')
+    arrow(ax, Rx, R2y - bh/2, Rx, R2y - bh/2 - 0.35)
 
-    arr(ax, 0.18, 0.690, 0.18, 0.675)
-    arr(ax, 0.18, 0.621, 0.18, 0.605)   # eₜ downward
+    R3y = R2y - bh - 0.35
+    box(ax, Rx, R3y, bw, bh,
+        ['Probe Embedding  e\u209c',
+         'Similarity  S\u209c = e\u209c \u00b7 e\u2080       Delta  \u03b4\u209c = e\u209c \u2212 e\u2080'],
+        bold_first=True)
 
-    # δₜ = eₜ − e₀
-    box(ax, 0.55, 0.615, 0.22, 0.036,
-        'δₜ  =  eₜ  −  e₀     (embedding delta)', fc='#312e81', ec='#4338ca',
-        fontsize=7.5)
-    # e₀ tapped from enrollment box
-    ax.annotate('', xy=(0.44, 0.615), xytext=(0.44, 0.760),
-                arrowprops=dict(arrowstyle='->', color='#9ca3af', lw=1.0,
-                                connectionstyle='arc3,rad=0.0'), zorder=2)
-    arr(ax, 0.27, 0.615, 0.44, 0.615,
-        label='Sₜ = eₜ · e₀', label_side='right')
-    # separate δₜ branch
-    ax.plot([0.27, 0.44], [0.612, 0.612], color='#6b7280', lw=0.7, linestyle=':', zorder=1)
+    # e0 →  R3y  (cross-column arrow for similarity / delta)
+    ax.annotate('', xy=(Rx - bw/2 - 0.05, R3y), xytext=(Lx + bw/2 + 0.05, L3y),
+                arrowprops=dict(arrowstyle='->', color='black', lw=1.1, mutation_scale=9),
+                zorder=2)
+    ax.text((Lx + Rx)/2, (L3y + R3y)/2 + 0.12, 'e\u2080 (fixed reference)',
+            ha='center', fontsize=7.5, style='italic', color='#333333')
 
-    # UC3 6D features (independent)
-    box(ax, 0.82, 0.648, 0.26, 0.060,
-        '6D Presence Features\n[face_conf, area, yaw, pitch, roll, motion]',
-        fc='#064e3b', ec='#065f46', fontsize=7.8)
-    arr(ax, 0.82, 0.688, 0.82, 0.618, label='(per-frame)', label_side='right')
+    # ── Temporal model zone ─────────────────────────────────────────
+    Ty = R3y - bh/2 - 0.5   # top of temporal zone
+    hline(ax, Ty + 0.3, 0.3, 9.7, ls='--')
+    ax.text(W/2, Ty + 0.42, 'Temporal Modeling', ha='center',
+            fontsize=8, style='italic', color='#555555')
 
-    # ── TEMPORAL MODELS ──────────────────────────────────────────────
-    # UC2
-    box(ax, 0.18, 0.470, 0.26, 0.080,
-        'UC2\nShort-Term Identity Instability\nLSTM  |  window W',
-        fc='#78350f', ec='#b45309', fontsize=8, bold=True)
-    arr(ax, 0.18, 0.597, 0.18, 0.512,
-        label=' Sₜ  (similarity\n  sequence)', label_side='right')
+    # Three temporal models side by side
+    UC2x, UC3x, UC4x = 1.8, 5.0, 8.2
+    UCy = Ty - 0.28
+    small_bw = 2.7
 
-    # UC4
-    box(ax, 0.50, 0.470, 0.26, 0.080,
-        'UC4\nLong-Term Embedding Drift\nBi-LSTM  |  120-frame buffer',
-        fc='#312e81', ec='#4338ca', fontsize=8, bold=True)
-    arr(ax, 0.55, 0.597, 0.50, 0.512,
-        label=' δₜ  (embedding\n  delta, 120-frame)', label_side='right')
+    box(ax, UC2x, UCy, small_bw, 0.92,
+        ['UC2  \u2014  Identity Instability', 'LSTM  |  window W'],
+        fontsize=8, bold_first=True)
 
-    # UC3
-    box(ax, 0.82, 0.470, 0.26, 0.080,
-        'UC3\nPresence & Attentiveness\nBi-LSTM  |  window W',
-        fc='#064e3b', ec='#065f46', fontsize=8, bold=True)
-    arr(ax, 0.82, 0.618, 0.82, 0.512,
-        label=' 6D features\n  (window)', label_side='right')
+    box(ax, UC3x, UCy, small_bw, 0.92,
+        ['UC3  \u2014  Presence & Attentiveness', 'Bi-LSTM  |  6D features'],
+        fontsize=8, bold_first=True)
 
-    # Output labels under each UC
-    box(ax, 0.18, 0.380, 0.14, 0.038,
-        'Iₜ   Instability ∈ [0,1]', fc='#1c1917', ec='#78350f', fontsize=7.5)
-    arr(ax, 0.18, 0.430, 0.18, 0.400)
+    box(ax, UC4x, UCy, small_bw, 0.92,
+        ['UC4  \u2014  Embedding Drift', 'Bi-LSTM  |  120-frame buffer'],
+        fontsize=8, bold_first=True)
 
-    box(ax, 0.50, 0.380, 0.14, 0.038,
-        'Dₜ   Drift ∈ [0,1]', fc='#1c1917', ec='#4338ca', fontsize=7.5)
-    arr(ax, 0.50, 0.430, 0.50, 0.400)
+    # Arrows from probe box to temporal models
+    # S_t → UC2
+    ax.annotate('', xy=(UC2x, UCy + 0.92/2),
+                xytext=(Rx - 0.3, R3y - bh/2),
+                arrowprops=dict(arrowstyle='->', color='black', lw=1.0,
+                                mutation_scale=8,
+                                connectionstyle='arc3,rad=0.15'), zorder=2)
+    ax.text(UC2x + 0.1, UCy + 0.92/2 + 0.2, 'S\u209c', fontsize=8, style='italic')
 
-    box(ax, 0.82, 0.380, 0.14, 0.038,
-        'Pₜ   Presence ∈ [0,1]', fc='#1c1917', ec='#065f46', fontsize=7.5)
-    arr(ax, 0.82, 0.430, 0.82, 0.400)
+    # 6D feats → UC3  (straight down from right col)
+    ax.annotate('', xy=(UC3x, UCy + 0.92/2),
+                xytext=(Rx, R3y - bh/2),
+                arrowprops=dict(arrowstyle='->', color='black', lw=1.0,
+                                mutation_scale=8,
+                                connectionstyle='arc3,rad=0.05'), zorder=2)
+    ax.text(UC3x + 0.08, UCy + 0.92/2 + 0.22, '6D features', fontsize=7.5, style='italic')
 
-    # Sₜ direct to UC5
-    box(ax, 0.50, 0.310, 0.50, 0.042,
-        'Risk Vector   rₜ  =  [ Sₜ   Iₜ   Pₜ   Dₜ ]   ∈  ℝ⁴      (no thresholding)',
-        fc='#0f172a', ec='#475569', fontsize=8.5, bold=True)
-    arr(ax, 0.18, 0.361, 0.26, 0.310)
-    arr(ax, 0.50, 0.361, 0.50, 0.332)
-    arr(ax, 0.82, 0.361, 0.74, 0.310)
-    # Sₜ drop from similarity computation
-    ax.annotate('', xy=(0.30, 0.311), xytext=(0.30, 0.597),
-                arrowprops=dict(arrowstyle='->', color='#9ca3af', lw=0.9,
-                                linestyle='dashed', connectionstyle='arc3,rad=0.0'), zorder=2)
-    ax.text(0.305, 0.450, 'Sₜ', fontsize=7, color='#9ca3af', style='italic')
+    # δ_t → UC4
+    ax.annotate('', xy=(UC4x, UCy + 0.92/2),
+                xytext=(Rx + 0.3, R3y - bh/2),
+                arrowprops=dict(arrowstyle='->', color='black', lw=1.0,
+                                mutation_scale=8,
+                                connectionstyle='arc3,rad=-0.15'), zorder=2)
+    ax.text(UC4x - 0.05, UCy + 0.92/2 + 0.2, '\u03b4\u209c', fontsize=8, style='italic')
 
-    # ── RISK FUSION ──────────────────────────────────────────────────
-    box(ax, 0.50, 0.215, 0.38, 0.072,
-        'UC5 — GRU Risk Fusion\nSession-level BCE supervision  |  hidden dim = 32',
-        fc='#1a1a2e', ec='#94a3b8', fontsize=9, bold=True, lw=1.8)
-    arr(ax, 0.50, 0.289, 0.50, 0.251)
+    # Outputs: I_t, P_t, D_t
+    OUTy = UCy - 0.92/2 - 0.45
+    for ucx, lbl in [(UC2x, 'I\u209c'), (UC3x, 'P\u209c'), (UC4x, 'D\u209c')]:
+        arrow(ax, ucx, UCy - 0.92/2, ucx, OUTy + 0.18)
+        ax.text(ucx, OUTy, lbl, ha='center', va='center',
+                fontsize=9, style='italic', fontweight='bold')
 
-    box(ax, 0.50, 0.138, 0.30, 0.055,
-        'Risk Trajectory   ρₜ  ∈  [0, 1]', fc='#1e293b', ec='#38bdf8',
-        fontsize=8.5, bold=False)
-    arr(ax, 0.50, 0.179, 0.50, 0.167)
+    # ── Risk fusion zone ─────────────────────────────────────────────
+    RFy = OUTy - 0.55
+    hline(ax, OUTy - 0.28, 0.3, 9.7, ls='--')
+    ax.text(W/2, OUTy - 0.19, 'Risk Fusion', ha='center',
+            fontsize=8, style='italic', color='#555555')
 
-    box(ax, 0.50, 0.065, 0.34, 0.058,
-        'Final Session Risk   ρ_T\n(session-level probabilistic output)',
-        fc='#7f1d1d', ec=C_NOTE, fontsize=9, bold=True, lw=1.8)
-    arr(ax, 0.50, 0.110, 0.50, 0.095)
+    box(ax, W/2, RFy, 6.5, 0.72,
+        ['UC5  \u2014  GRU Risk Fusion',
+         'Input: r\u209c = [ S\u209c,  I\u209c,  P\u209c,  D\u209c ]   |   Session-level BCE supervision only'],
+        lw=1.6, bold_first=True)
 
-    # ── Invariant annotations (right margin) ─────────────────────────
-    ann_x = 0.99
-    ax.text(ann_x, 0.470, 'Temporal Modeling\nat All Layers',
-            ha='right', va='center', fontsize=7, color=C_NOTE, style='italic')
-    ax.text(ann_x, 0.215, 'Session-Level\nSupervision Only',
-            ha='right', va='center', fontsize=7, color=C_NOTE, style='italic')
-    ax.text(ann_x, 0.065, 'Continuous Probability\n— No Decision Threshold —',
-            ha='right', va='center', fontsize=7.5, color=C_NOTE,
-            style='italic', fontweight='bold')
+    # Fan-in arrows from I_t, P_t, D_t to UC5
+    for ucx in [UC2x, UC3x, UC4x]:
+        ax.annotate('', xy=(W/2 + (ucx - W/2)*0.55, RFy + 0.72/2),
+                    xytext=(ucx, OUTy - 0.20),
+                    arrowprops=dict(arrowstyle='->', color='black', lw=0.9,
+                                    mutation_scale=8), zorder=2)
+    # Also S_t direct to UC5
+    ax.annotate('', xy=(W/2 - 2.5, RFy + 0.72/2),
+                xytext=(Rx - 1.0, R3y - bh/2),
+                arrowprops=dict(arrowstyle='->', color='black', lw=0.9,
+                                mutation_scale=8,
+                                connectionstyle='arc3,rad=0.25'), zorder=2)
+    ax.text(W/2 - 2.8, RFy + 0.72/2 + 0.12, 'S\u209c', fontsize=8, style='italic')
 
-    # UC1 label
-    ax.text(0.18, 0.958, 'UC1', ha='center', va='bottom',
-            fontsize=8, color='#6b7280', fontweight='bold')
+    # Output risk
+    RTy = RFy - 0.72/2 - 0.5
+    arrow(ax, W/2, RFy - 0.72/2, W/2, RTy + 0.30)
+    box(ax, W/2, RTy, 5.2, 0.60,
+        ['\u03c1\u209c  \u2014  Session Risk Trajectory  \u2208  [0, 1]',
+         'Final output: \u03c1_T  (continuous probability, no threshold)'],
+        lw=1.6, bold_first=True)
 
-    plt.tight_layout(pad=0.3)
+    plt.tight_layout(pad=0.4)
     path = os.path.join(OUT_DIR, 'fig6_system_architecture.png')
     plt.savefig(path, facecolor='white')
     plt.close()
-    print(f'  ✅  Saved {path}')
+    print(f'  \u2705  Saved {path}')
 
 
 # ════════════════════════════════════════════════════════════════════════════
-# FIGURE 7 — System Workflow (Conceptual View)
+# FIG 7: SYSTEM WORKFLOW  (vertical block flow — StudyCorgi style)
 # ════════════════════════════════════════════════════════════════════════════
 def fig7_workflow():
-    fig, ax = plt.subplots(figsize=(9, 7.5))
-    ax.set_xlim(0, 1)
-    ax.set_ylim(0, 1)
+    fig, ax = plt.subplots(figsize=(6, 9))
+    ax.set_xlim(0, 6)
+    ax.set_ylim(0, 9)
     ax.axis('off')
     fig.patch.set_facecolor('white')
 
-    ax.text(0.5, 0.975, 'System Workflow — Enrollment, Monitoring, and Risk Accumulation',
-            ha='center', va='top', fontsize=11, fontweight='bold', color=C_DARK)
+    ax.text(3, 8.82,
+            'System Workflow: Enrollment, Monitoring, and Risk Accumulation',
+            ha='center', va='top', fontsize=9.5, fontweight='bold')
 
-    # ── Column config ────────────────────────────────────────────────
-    # 3 columns: Phase 1 | Phase 2 | Phase 3
-    col = [0.18, 0.52, 0.85]
-    bw, bh = 0.28, 0.058
+    # ── Boxes (top → bottom) ────────────────────────────────────────
+    cx  = 3.0
+    bw  = 4.8
+    bh  = 0.68
+    gap = 0.40
 
-    # ── Phase headers ────────────────────────────────────────────────
-    for cx, label, sub in [
-        (col[0], 'Phase 1', 'ENROLLMENT'),
-        (col[1], 'Phase 2', 'LIVE MONITORING'),
-        (col[2], 'Phase 3', 'SESSION END'),
+    items = [
+        # (y-center, lines, bold_first, thick_border)
+        (8.10, ['PHASE 1 — ENROLLMENT'],                              True,  True),
+        (7.35, ['Capture single reference image'],                    False, False),
+        (6.65, ['UC1: ResNet-50 extract embedding'],                  False, False),
+        (5.95, ['e\u2080  \u2014  Immutable Enrollment Embedding',
+                '(stored as fixed session anchor)'],                  True,  True),
+        (5.12, ['PHASE 2 — LIVE MONITORING  (per frame f\u209c)'],   True,  True),
+        (4.37, ['UC1: Extract probe embedding e\u209c',
+                'Compute  S\u209c = e\u209c \u00b7 e\u2080   |   \u03b4\u209c = e\u209c \u2212 e\u2080'],  True, False),
+        (3.60, ['Extract 6D presence features',
+                '[face confidence, area, yaw, pitch, roll, motion]'], False, False),
+        (2.82, ['UC2: Instability I\u209c  |  UC3: Presence P\u209c  |  UC4: Drift D\u209c',
+                'Short-window LSTM       6D Bi-LSTM        120-frame Bi-LSTM'],       True, False),
+        (2.04, ['UC5 GRU: update session risk \u03c1\u209c',
+                'Input: r\u209c = [ S\u209c,  I\u209c,  P\u209c,  D\u209c ]'],          True,  False),
+        (1.13, ['PHASE 3 — SESSION END'],                             True,  True),
+        (0.48, ['Final session risk \u03c1_T  \u2208  [0, 1]',
+                'Continuous probability \u2014 no decision threshold applied'],       True,  True),
+    ]
+
+    for (cy, lines, bf, thick) in items:
+        h = bh * 1.22 if len(lines) > 1 else bh
+        box(ax, cx, cy, bw, h, lines, bold_first=bf, lw=1.8 if thick else 1.0,
+            fontsize=8.5 if not thick else 9.0)
+
+    # ── Arrows between consecutive boxes ────────────────────────────
+    # Compute bottom/top edges
+    ys = [cy for (cy, _, _, _) in items]
+    hs = [bh*1.22 if len(lines)>1 else bh for (_, lines, _, _) in items]
+
+    for i in range(len(ys)-1):
+        bot = ys[i]   - hs[i]/2
+        top = ys[i+1] + hs[i+1]/2
+        mid = (bot + top) / 2
+        arrow(ax, cx, bot, cx, top)
+
+    # ── Phase bracket annotations (left side) ───────────────────────
+    for y0, y1, label in [
+        (8.44, 7.95, 'Phase 1'),
+        (5.47, 5.45, 'Enrollment'),
+        (4.74, 1.67, 'Phase 2'),
+        (1.47, 0.13, 'Phase 3'),
     ]:
-        box(ax, cx, 0.920, 0.27, 0.064,
-            f'{label}\n{sub}',
-            fc=C_PHASE, ec='#1d4ed8', fontsize=9.5, bold=True, lw=1.6)
+        pass   # keep diagram clean — phase headers in boxes are enough
 
-    # ── Phase 1 (Enrollment) ─────────────────────────────────────────
-    steps_p1 = [
-        (0.840, 'Capture single\nenrollment image'),
-        (0.755, 'UC1: ResNet-50\nextract embedding'),
-        (0.670, 'e₀ — immutable embedding\n(L2-normalised, 256-dim)'),
-        (0.585, 'Store e₀ as\nsession anchor\n(never updated)'),
-    ]
-    fcs_p1 = [C_ENROLL, '#1e3a5f', '#7f1d1d', '#7f1d1d']
-    ecs_p1 = ['#166534', '#1d4ed8', C_NOTE, C_NOTE]
-    for (cy, txt), fc, ec in zip(steps_p1, fcs_p1, ecs_p1):
-        box(ax, col[0], cy, bw, bh, txt, fc=fc, ec=ec, fontsize=8)
+    # ── Loop annotation ─────────────────────────────────────────────
+    # Right-side brace showing the monitoring loop
+    loop_top = items[5][0] + hs[5]/2 + 0.05   # top of per-frame section
+    loop_bot = items[8][0] - hs[8]/2 - 0.05
+    bx = cx + bw/2 + 0.18
 
-    # arrows p1
-    for i in range(len(steps_p1) - 1):
-        y1 = steps_p1[i][0] - bh / 2
-        y2 = steps_p1[i + 1][0] + bh / 2
-        arr(ax, col[0], y1, col[0], y2)
+    ax.plot([bx, bx+0.22, bx+0.22, bx],
+            [loop_top, loop_top, loop_bot, loop_bot],
+            color='black', lw=0.9, zorder=2)
+    ax.text(bx + 0.28, (loop_top+loop_bot)/2,
+            'repeat for\nt+1 \u2026 T',
+            ha='left', va='center', fontsize=7.5, style='italic', color='#333333')
 
-    # ── Phase 2 (Live Monitoring) ────────────────────────────────────
-    steps_p2 = [
-        (0.840, 'Receive frame  fₜ'),
-        (0.752, 'UC1: extract eₜ\ncompute  Sₜ = eₜ · e₀\ncompute  δₜ = eₜ − e₀'),
-        (0.650, 'Extract\n6D presence features'),
-        (0.560, 'UC2:  instability  Iₜ\n(window of Sₜ values)'),
-        (0.465, 'UC4:  drift  Dₜ\n(120-frame δₜ buffer)'),
-        (0.370, 'UC3:  presence  Pₜ\n(window of 6D features)'),
-        (0.280, 'Assemble risk vector\nrₜ = [Sₜ, Iₜ, Pₜ, Dₜ]'),
-        (0.185, 'UC5 GRU: update\nρₜ from rₜ and h_{t-1}'),
-    ]
-    fcs_p2 = [C_ENROLL, '#1e3a5f', '#064e3b',
-              '#78350f', '#312e81', '#064e3b',
-              '#0f172a', '#0f172a']
-    ecs_p2 = ['#166534', '#1d4ed8', '#065f46',
-              '#b45309', '#4338ca', '#065f46',
-              '#475569', '#94a3b8']
-    bh2 = [0.052, 0.078, 0.052, 0.058, 0.058, 0.058, 0.052, 0.058]
-    for (cy, txt), fc, ec, h in zip(steps_p2, fcs_p2, ecs_p2, bh2):
-        box(ax, col[1], cy, bw, h, txt, fc=fc, ec=ec, fontsize=8)
-
-    for i in range(len(steps_p2) - 1):
-        h_top = bh2[i]
-        h_bot = bh2[i + 1]
-        y1 = steps_p2[i][0] - h_top / 2
-        y2 = steps_p2[i + 1][0] + h_bot / 2
-        arr(ax, col[1], y1, col[1], y2)
-
-    # Loop back arrow: "Repeat for t+1"
-    ax.annotate('',
-                xy=(col[1] + 0.15, 0.840),
-                xytext=(col[1] + 0.15, 0.185 - 0.029),
-                arrowprops=dict(arrowstyle='->', color='#6b7280', lw=0.9,
-                                connectionstyle='arc3,rad=0.0'), zorder=2)
-    ax.text(col[1] + 0.165, 0.510, 'repeat for\nt+1 … T',
-            ha='left', va='center', fontsize=7, color='#6b7280', style='italic')
-
-    # ── Phase 3 (Session End) ────────────────────────────────────────
-    steps_p3 = [
-        (0.840, 'Session ends\n(t = T)'),
-        (0.740, 'Final output:\nρ_T  ∈  [0, 1]'),
-        (0.630, 'Continuous probability\n— no threshold applied —'),
-        (0.520, 'Risk score forwarded\nto human review'),
-        (0.400, 'Session risk log\nstored for audit'),
-    ]
-    fcs_p3 = [C_ENROLL, '#7f1d1d', '#7f1d1d', '#1e3a5f', '#1e3a5f']
-    ecs_p3 = ['#166534', C_NOTE, C_NOTE, '#1d4ed8', '#1d4ed8']
-    bh3 = 0.070
-    for (cy, txt), fc, ec in zip(steps_p3, fcs_p3, ecs_p3):
-        box(ax, col[2], cy, bw, bh3, txt, fc=fc, ec=ec, fontsize=8)
-
-    for i in range(len(steps_p3) - 1):
-        y1 = steps_p3[i][0] - bh3 / 2
-        y2 = steps_p3[i + 1][0] + bh3 / 2
-        arr(ax, col[2], y1, col[2], y2)
-
-    # ── Cross-phase arrows ───────────────────────────────────────────
-    # e₀ flows into Phase 2
-    ax.annotate('',
-                xy=(col[1] - 0.14, 0.752),
-                xytext=(col[0] + 0.14, 0.670),
-                arrowprops=dict(arrowstyle='->', color='#9ca3af', lw=1.0,
-                                linestyle='dashed',
-                                connectionstyle='arc3,rad=-0.2'), zorder=2)
-    ax.text((col[0] + col[1]) / 2 - 0.01, 0.725,
-            'e₀', ha='center', va='center', fontsize=7.5,
-            color='#9ca3af', style='italic')
-
-    # Phase 2 final risk → Phase 3
-    ax.annotate('',
-                xy=(col[2] - 0.14, 0.840),
-                xytext=(col[1] + 0.14, 0.185),
-                arrowprops=dict(arrowstyle='->', color='#9ca3af', lw=1.0,
-                                linestyle='dashed',
-                                connectionstyle='arc3,rad=-0.3'), zorder=2)
-    ax.text((col[1] + col[2]) / 2 + 0.02, 0.530,
-            'ρ_T', ha='center', va='center', fontsize=7.5,
-            color='#9ca3af', style='italic')
-
-    # ── Legend ───────────────────────────────────────────────────────
-    legend_patches = [
-        mpatches.Patch(fc=C_ENROLL,   ec='#166534', label='Input / Phase boundary'),
-        mpatches.Patch(fc='#1e3a5f',  ec='#1d4ed8', label='Feature extraction (UC1)'),
-        mpatches.Patch(fc='#78350f',  ec='#b45309', label='Short-window model (UC2)'),
-        mpatches.Patch(fc='#312e81',  ec='#4338ca', label='Long-window model (UC4)'),
-        mpatches.Patch(fc='#064e3b',  ec='#065f46', label='Presence model (UC3)'),
-        mpatches.Patch(fc='#7f1d1d',  ec=C_NOTE,    label='Risk (UC5) / Invariant'),
-    ]
-    ax.legend(handles=legend_patches, loc='lower right',
-              fontsize=7.5, framealpha=0.9, edgecolor='#e5e7eb',
-              ncol=2, title='Module Type', title_fontsize=7.5)
-
-    plt.tight_layout(pad=0.3)
+    plt.tight_layout(pad=0.4)
     path = os.path.join(OUT_DIR, 'fig7_workflow.png')
     plt.savefig(path, facecolor='white')
     plt.close()
-    print(f'  ✅  Saved {path}')
+    print(f'  \u2705  Saved {path}')
 
 
 # ── Main ─────────────────────────────────────────────────────────────────────
 if __name__ == '__main__':
-    print('Generating architecture & workflow diagrams...')
-    print('──────────────────────────────────────────────')
+    print('Generating IEEE-style diagrams...')
+    print('─' * 40)
     fig6_architecture()
     fig7_workflow()
-    print('──────────────────────────────────────────────')
-    print(f'Saved to: {OUT_DIR}')
+    print('─' * 40)
+    print(f'Output: {OUT_DIR}')
