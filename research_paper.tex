@@ -11,8 +11,10 @@
 
 \begin{document}
 
-\title{A Multi-Signal Probabilistic Temporal Risk Accumulation Engine\\
-for AI-Based Online Proctoring Under Strict One-Shot Identity Constraints}
+\title{
+A Multi-Signal Probabilistic Temporal Risk Accumulation Framework\\
+for AI-Based Online Proctoring Under Strict One-Shot Identity Constraints
+}
 
 \author{
 \IEEEauthorblockN{Shyam Saran P}
@@ -25,306 +27,144 @@ shyamsaran348@gmail.com}
 
 \maketitle
 
+% ============================================================
 \begin{abstract}
-We present a Model-First, Research-Grade AI-Based Online Proctoring System that fundamentally departs from rule-based examination monitoring. The system integrates five learned neural components — a one-shot identity embedder (IDE), a temporal identity instability detector (IIM), a presence and attentiveness model (PAM), a long-horizon embedding drift detector (LDD), and a multi-signal GRU-based risk fusion engine (RFE) — into a unified, continuous probabilistic risk accumulation pipeline. Each model operates over temporal frame sequences, producing continuous evidence scores $\in [0,1]$ fused into a session-level risk trajectory. No thresholds or rules are employed at any stage. Through rigorous evaluation on 5,000 procedurally generated temporally realistic sessions, we demonstrate: LDD ablation causes the largest ROC-AUC drop of $-0.0440$ ($6.7\times$ any other signal); the temporal GRU (ROC-AUC = $0.9987$) categorically outperforms rule-based baselines ($0.8212$); calibration achieves ECE = $0.0072$ and Brier Score = $0.0126$; and the temporal fusion pipeline operates at $28.45$ms/frame on CPU — inherently real-time.
+We present a multi-signal probabilistic temporal risk accumulation framework for AI-based online proctoring under strict one-shot identity constraints. The system integrates an Identity Extractor (IDE), Identity Instability Model (IIM), Presence and Attentiveness Model (PAM), Long-term Drift Detector (LDD), and a GRU-based Risk Fusion Engine (RFE). All signals are continuous and temporally modeled without heuristic thresholds or rule-based overrides. Evaluation on procedurally generated temporally realistic sessions demonstrates strong discrimination (ROC-AUC = 0.9987), effective calibration (ECE = 0.0072), and smooth risk trajectories. Results confirm that long-horizon drift modeling contributes uniquely to detection of gradual impersonation scenarios.
 \end{abstract}
 
 \begin{IEEEkeywords}
-Online Proctoring, One-Shot Identity, GRU Risk Fusion, Temporal Anomaly Detection, Calibrated Probabilistic Inference
+Online Proctoring, Temporal Modeling, Risk Fusion, One-Shot Identity, Deep Learning
 \end{IEEEkeywords}
 
-% ---------------------------------------------------
+% ============================================================
 \section{Introduction}
 
-\subsection{The Problem}
-Online examination integrity has become a critical challenge in distance education. The shift to remote assessment exposes institutions to a broad spectrum of cheating behaviors: physical impersonation, temporary camera absence, gradual identity drift across a session, and flickering substitution patterns that evade short-term detection.
+Online examination integrity is increasingly challenged by remote assessment environments. Traditional rule-based systems rely on threshold-triggered alerts, while shallow classifiers collapse temporal behavior into binary decisions. We instead formulate online examination integrity as a multi-signal temporal probabilistic inference problem under strict one-shot identity constraints.
 
-Existing proctoring systems predominantly employ one of two approaches:
+The proposed framework operates in three conceptual layers:
 \begin{enumerate}
-    \item \textbf{Rule-based systems}: If gaze angle exceeds threshold $X$, flag. If similarity drops below threshold $Y$, alert. These systems require hand-crafted thresholds tuned per camera, per environment, and per population — generating both false positives that unfairly penalize innocent students and false negatives that miss sophisticated attacks.
-    \item \textbf{Binary classification approaches}: Shallow models trained on hand-engineered features output a binary ``cheating / not cheating'' label. These collapse the continuous, evolving nature of exam integrity into a single decision point, discarding the temporal structure that distinguishes honest behavior from adversarial manipulation.
+\item Frame-level feature extraction (IDE, PAM)
+\item Temporal modeling (IIM, LDD)
+\item Session-level probabilistic risk accumulation (RFE)
 \end{enumerate}
 
-\subsection{Our Contribution}
-We formulate online examination integrity as a \textbf{multi-signal temporal probabilistic inference problem under strict one-shot identity constraints}. This requires:
-\begin{itemize}
-    \item \textbf{Learned behavioral modeling} over temporal sequences, not hand-crafted thresholds.
-    \item \textbf{Continuous risk accumulation} over the full session, not instantaneous binary decisions.
-    \item \textbf{Complementary signal integration} from identity, behavioral, and presence dimensions.
-    \item \textbf{Strict identity constraints} preventing any adaptive reference drift that could be exploited.
-\end{itemize}
-
-We present a system satisfying all four requirements through a modular five-component architecture. Our key contributions are:
-\begin{enumerate}
-    \item A \textbf{one-shot identity pipeline} with immutable enrollment embeddings.
-    \item A \textbf{four-dimensional temporal risk vector} integrating frame-level and session-level signals.
-    \item A \textbf{GRU-based risk fusion engine} trained end-to-end with session-level BCE supervision.
-    \item A rigorous \textbf{ablation framework} on realistic noisy data demonstrating signal complementarity.
-    \item A \textbf{calibration analysis} confirming that risk outputs function as genuine probabilities.
-\end{enumerate}
-
-% ---------------------------------------------------
-\section{Related Work}
-
-\subsection{Traditional Proctoring Systems}
-Early automated proctoring relied on OpenCV-based face detection combined with gaze estimation \cite{Nigam2020, Atoum2017}. Systems such as ProctorU and Honorlock employ human oversight combined with alert-generation rules. These suffer from high false-positive rates in diverse lighting conditions and cultural settings where normal exam behavior triggers alerts.
-
-\subsection{Deep Learning in Proctoring}
-More recent work has applied face recognition models to identity verification \cite{Schroff2015}. Dewan et al. \cite{Dewan2019} proposed using CNN-based gaze estimation for presence verification. However, these works treat identity verification and behavioral assessment as separate classification problems rather than complementary temporal evidence streams.
-
-\subsection{Temporal Modeling in Security}
-LSTM-based anomaly detection has shown success in video surveillance \cite{Liu2018} and network intrusion detection \cite{Mahoney2003}. We extend this paradigm to proctoring by modeling the temporal trajectory of identity-behavioral signals over full exam sessions.
-
-\subsection{One-Shot Identity Verification}
-Face verification under one-shot constraints has been extensively studied, with seminal contributions from FaceNet \cite{Schroff2015}, ArcFace \cite{Deng2019}, and CosFace \cite{Wang2018}. Our work applies one-shot face embedding under a stricter constraint: the enrollment embedding is not only singular but immutably fixed, prohibiting any form of representation drift or online template update.
-
-% ---------------------------------------------------
+% ============================================================
 \section{System Overview and Workflow}
 
-\subsection{Workflow}
-The system operates in three phases.
-
-\textbf{Enrollment.} At session start, a single reference image is captured from the student's webcam. The IDE identity backbone extracts a 256-dimensional L2-normalized embedding $e_0$. This embedding is stored as an immutable session anchor. No further modification, averaging, or adaptation of $e_0$ occurs at any point during the session.
-
-\textbf{Per-Frame Processing.} At each frame $t$:
-\begin{enumerate}
-    \item IDE extracts a probe embedding $e_t$ and computes cosine similarity $S_t = e_t \cdot e_0$.
-    \item A 6-dimensional presence feature vector is extracted from the frame: face detection confidence, face area ratio, estimated yaw, pitch, roll, and optical-flow motion energy.
-    \item The embedding delta $\delta_t = e_t - e_0$ is computed relative to the fixed $e_0$.
-\end{enumerate}
-
-\textbf{Temporal Modeling.} Three temporal models process sliding windows:
-\begin{itemize}
-    \item IIM processes a rolling window of $S_t$ values to detect short-term identity instability patterns.
-    \item PAM processes a rolling window of the 6D presence features to model attentiveness.
-    \item LDD processes the last 120 frames of $[\delta_t \,\|\, S_t]$ vectors to detect long-horizon embedding drift.
-\end{itemize}
-
-\textbf{Risk Fusion.} At each frame $t$, the four signals $[S_t, I_t, P_t, D_t]$ form a 4-dimensional risk vector. RFE (GRU) processes the growing sequence of risk vectors and emits a continuous session risk $\rho_t \in [0, 1]$. The final session output is $\rho_T$ — no thresholding is applied at any stage.
-
-\begin{figure}[htbp]
-\centerline{\includegraphics[width=\columnwidth]{fig7_workflow.png}}
-\caption{Three-phase system workflow. Phase 1 (Enrollment): single reference image processed through IDE to produce the immutable embedding $e_0$. Phase 2 (Live Monitoring): per-frame pipeline producing signals $I_t, P_t, D_t$ and updating session risk via RFE. Phase 3 (Session End): final probabilistic output forwarded for human review.}
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{fig7_workflow.png}
+\caption{Operational workflow from enrollment to session-level risk estimation.}
 \label{fig:workflow}
 \end{figure}
 
-\subsection{High-Level Architecture}
-The system follows a feed-forward signal extraction and temporal fusion architecture:
-\begin{itemize}
-    \item Each camera frame passes through IDE (ResNet-50 backbone) to produce per-frame embeddings.
-    \item IIM and LDD consume derivatives of the IDE output: IIM receives the similarity sequence; LDD receives the embedding delta sequence relative to the immutable $e_0$.
-    \item PAM consumes independently extracted perceptual features (pose, presence, motion) not derived from the identity backbone.
-    \item All four signal streams converge into RFE, which maintains a GRU hidden state across the full session.
-\end{itemize}
+Enrollment produces a single immutable embedding $e_0$. During monitoring, each frame $f_t$ produces probe embedding $e_t$, similarity $S_t$, instability $I_t$, presence $P_t$, and drift $D_t$. The Risk Fusion Engine (RFE) updates risk $\rho_t$ over time, with final session risk $\rho_T$ committed without threshold overrides.
 
-Four design invariants hold throughout:
-\begin{enumerate}
-    \item \textbf{Immutable enrollment embedding} — $e_0$ is fixed at session start and never updated.
-    \item \textbf{No thresholding} — signal values are passed as continuous scalars; no comparison against cutoffs occurs at any component boundary.
-    \item \textbf{No decision override} — downstream components cannot override or veto upstream signals.
-    \item \textbf{Session-level supervision} — RFE is trained on the final timestep label only, forcing temporal accumulation rather than per-frame classification.
-\end{enumerate}
-
-% ---------------------------------------------------
-\section{Component-Level Evaluation}
-
-\subsection{Individual Model Performance}
-Each component was evaluated independently on a held-out dataset appropriate to its task prior to system integration. Table \ref{tab:components} reports ROC-AUC and accuracy per component.
-
-\begin{table}[htbp]
-\caption{Individual Component Performance}
-\label{tab:components}
-\begin{center}
-\begin{tabular}{llcc}
-\toprule
-\textbf{Component} & \textbf{Task} & \textbf{ROC-AUC} & \textbf{Acc.} \\
-\midrule
-IDE & Identity similarity & 0.6400 & -- \\
-IIM & Short-term instability & 0.6500 & 0.6300 \\
-PAM & Presence \& attentiveness & 0.9226 & 0.8745 \\
-LDD & Long-term drift & 0.7848 & 0.7500 \\
-\textbf{RFE} & \textbf{Multi-signal risk fusion} & \textbf{0.9987} & \textbf{--} \\
-\bottomrule
-\end{tabular}
-\end{center}
-\end{table}
-
-\subsection{From Component Signals to Session-Level Risk}
-IDE and IIM exhibit modest individual discrimination capability (ROC-AUC $0.64$--$0.65$). This is expected and intentional: each component is designed to model a specific, narrow dimension of proctoring evidence rather than to function as a standalone classifier.
-
-No individual component provides sufficient evidence for reliable session-level integrity assessment. RFE integrates all four signals over time, exploiting their complementarity. The system-level ROC-AUC of $0.9987$ substantially exceeds any individual component, validating the multi-signal temporal fusion design.
-
-% ---------------------------------------------------
+% ============================================================
 \section{Mathematical Formulation}
 
-\subsection{Intuition}
-Before detailing the formal equations, we provide the intuition behind the system. \textbf{First, single signals often fail}: instantaneous frames are noisy, easily spoofed, or legitimately degraded (e.g., poor lighting). \textbf{Second, temporal modeling helps}: by tracking sequences over time, we can distinguish a momentary anomaly (like a student stretching) from a sustained integrity violation. \textbf{Finally, fusion is necessary}: identity drift, presence, and short-term instability provide complementary evidence. Only by fusing them can we estimate a robust session-level risk.
+Given enrollment embedding $e_0$ and probe embedding $e_t$:
 
-\subsection{System Notation}
-Let a proctoring session consist of $T$ frames: $F = \{f_1, f_2, ..., f_T\}$. At enrollment, a student provides a single reference image from which we extract an immutable enrollment embedding:
 \begin{equation}
-    e_0 = \phi_{\text{ResNet}}(f_{\text{enrollment}}) \in \mathbb{R}^{256}, \quad ||e_0||_2 = 1
+S_t = e_t \cdot e_0
 \end{equation}
 
-\subsection{IDE — Continuous Identity Similarity}
-At each frame $t$, we extract a probe embedding:
+Delta embedding:
 \begin{equation}
-    e_t = \phi_{\text{ResNet}}(f_t) \in \mathbb{R}^{256}, \quad ||e_t||_2 = 1
-\end{equation}
-cosine similarity equals the dot product:
-\begin{equation}
-    S_t = e_t \cdot e_0 \in [-1, 1]
+\delta_t = e_t - e_0
 \end{equation}
 
-\subsection{IIM — Short-Term Identity Instability}
-IIM models the temporal pattern of $S_t$ over a rolling window $W$. A unidirectional LSTM processes this sequence:
+Risk vector:
 \begin{equation}
-    I_t = \sigma(f_{\text{LSTM\_IIM}}(s_{t-W:t})) \in [0, 1]
+r_t = [S_t, I_t, P_t, D_t]
 \end{equation}
 
-\subsection{PAM — Presence and Attentiveness Modeling}
-A bidirectional LSTM processes a rolling window of 6D pose/motion features:
+RFE GRU update:
 \begin{equation}
-    P_t = \sigma(f_{\text{BiLSTM\_PAM}}(p_{t-W:t})) \in [0, 1]
+\rho_t = \sigma(W_h h_t + b)
 \end{equation}
 
-\subsection{LDD — Long-Term Identity Drift}
-LDD detects gradual substitution. At each timestep:
-\begin{equation}
-    \delta_t = e_t - e_0 \in \mathbb{R}^{256}
-\end{equation}
-A bidirectional LSTM processes the full sequence of $[\delta_t \,\|\, S_t]$ across 120 frames:
-\begin{equation}
-    D_t = \sigma(f_{\text{BiLSTM\_LDD}}(D_{t-119:t})) \in [0, 1]
-\end{equation}
+Training uses session-level binary cross-entropy on $\rho_T$ only.
 
-\subsection{RFE — Risk Fusion via GRU}
-At each frame $t$, a 4-dimensional risk vector is assembled: $r_t = [S_t, I_t, P_t, D_t]^T \in \mathbb{R}^4$.
-The GRU processes the sequence of risk vectors:
-\begin{equation}
-    h_t = \text{GRU}(r_t, h_{t-1}), \quad h_t \in \mathbb{R}^{32}
-\end{equation}
-The risk trajectory is emitted continuously:
-\begin{equation}
-    \rho_t = \sigma(W_h h_t + b) \in [0, 1], \quad \forall t \in \{1,...,T\}
-\end{equation}
-
-The session-level risk is the final output $\rho_T$. Training uses session-level BCE loss only:
-\begin{equation}
-    \mathcal{L} = -[y \log \hat{\rho}_T + (1-y) \log(1 - \hat{\rho}_T)]
-\end{equation}
-
-% ---------------------------------------------------
+% ============================================================
 \section{System Architecture}
 
-\subsection{Component Overview}
-To reduce the complexity of the temporal pipeline into a simple layered abstraction, we summarize the five core components and their operating timescales in Table \ref{tab:summary}.
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{fig6_system_architecture.png}
+\caption{Multi-signal architecture under strict one-shot identity constraint.}
+\label{fig:architecture}
+\end{figure*}
 
-\begin{table}[htbp]
-\caption{System Component Summary}
-\label{tab:summary}
-\begin{center}
-\begin{tabular}{llp{2.5cm}}
-\toprule
-\textbf{Component} & \textbf{Purpose} & \textbf{Timescale} \\
-\midrule
-\textbf{IDE} & Identity similarity & Frame-level \\
-\textbf{IIM} & Short-term instability & 5--10 sec window \\
-\textbf{PAM} & Presence modeling & 5--10 sec window \\
-\textbf{LDD} & Long-term drift & Full session (120 buf) \\
-\textbf{RFE} & Risk accumulation & Full session \\
-\bottomrule
-\end{tabular}
-\end{center}
-\end{table}
+The Identity Extractor (IDE) computes embeddings. The Identity Instability Model (IIM) detects short-term fluctuations in similarity. The Presence and Attentiveness Model (PAM) models behavioral consistency. The Long-term Drift Detector (LDD) captures cumulative embedding displacement. The Risk Fusion Engine (RFE) integrates all signals temporally.
 
-\begin{figure}[htbp]
-\centerline{\includegraphics[width=\columnwidth]{fig6_system_architecture.png}}
-\caption{Technical system architecture. IDE (ResNet-50) is shared across enrollment and per-frame processing. The immutable embedding $e_0$ anchors IIM and LDD. PAM independently processes 6D presence features. All signals are fused by RFE (GRU) into session risk $\rho_t$.}
-\label{fig:arch}
-\end{figure}
-
-\subsection{One-Shot Identity Constraint}
-The enrollment embedding $e_0$ is computed exactly once at session start. It is \textbf{never updated, averaged, thresholded, or adapted}. All downstream models ($S_t$, $\delta_t$) remain anchored to this fixed reference.
-
-% ---------------------------------------------------
+% ============================================================
 \section{Experimental Setup}
 
-We constructed a procedural simulation framework generating temporally realistic sequences. Each signal is generated via an AR(1) random walk ($\phi = 0.85$):
-\begin{equation}
-    x_t = \phi x_{t-1} + (1-\phi)\mu + \varepsilon_t, \quad \varepsilon_t \sim \mathcal{N}(0, \sigma^2(1-\phi^2))
-\end{equation}
+Evaluation uses 5,000 procedurally generated sessions (120 frames each) with AR(1) temporal correlation and overlapping Gaussian distributions. Models are trained using Adam optimizer with cosine learning rate schedule.
 
-Five session classes were synthesized: Genuine, Abrupt Impersonation, Sophisticated Drift (LDD target), Presence Absence, and Flickering Substitution. The dataset contains 5,000 sessions of $T=120$ frames each.
-
-% ---------------------------------------------------
+% ============================================================
 \section{Results}
 
-\subsection{Signal Importance Ablation}
-Five identical GRU models were trained — a baseline and four with individual signal columns zeroed out.
-
-\begin{figure}[htbp]
-\centerline{\includegraphics[width=\columnwidth]{fig1_ablation.png}}
-\caption{Signal ablation results. Removing LDD causes the largest drop.}
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{fig1_ablation.png}
+\caption{Signal ablation analysis (ROC-AUC).}
 \label{fig:ablation}
 \end{figure}
 
-LDD removal causes the largest AUC drop ($-0.0440$), $6.7\times$ larger than any other signal, validating LDD's unique contribution to detecting sophisticated drift attacks.
-
-\subsection{Baseline Comparisons}
-\begin{figure}[htbp]
-\centerline{\includegraphics[width=\columnwidth]{fig2_baselines.png}}
-\caption{ROC-AUC and Brier Score for baselines vs. Temporal GRU.}
-\label{fig:baselines}
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{fig2_baselines.png}
+\caption{Baseline comparison (ROC-AUC and Brier score).}
+\label{fig:baseline}
 \end{figure}
 
-The threshold classifier is separated from our system by $\Delta\text{ROC} = 0.178$, directly refuting rule-based proctoring. Non-temporal MLP is outperformed by the GRU ($0.9987$), showing ordered temporal trajectory matters.
-
-\subsection{Calibration \& Reliability}
-\begin{figure}[htbp]
-\centerline{\includegraphics[width=\columnwidth]{fig4_calibration.png}}
-\caption{Reliability diagram. The GRU achieves ECE = 0.0072.}
-\label{fig:calib}
-\end{figure}
-The GRU achieves ECE = $0.0072$ and $97.8\%$ of predictions fall in the $[0,0.1]$ or $[0.9,1.0]$ bounds. Mean+LogReg exhibits the Calibration Paradox: perfectly calibrated per-bin but $2.6\times$ worse Brier Score.
-
-\subsection{Risk Trajectory Analysis}
-\begin{figure}[htbp]
-\centerline{\includegraphics[width=\columnwidth]{fig3_trajectories.png}}
-\caption{Risk trajectories for all five session archetypes across 120 frames.}
-\label{fig:traj}
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{fig3_trajectories.png}
+\caption{Risk trajectories across session archetypes.}
+\label{fig:trajectories}
 \end{figure}
 
-Presence Absence peaks at frame 87 (not 119) — the GRU detects absence during the relevant observation window and stabilizes, demonstrating principled evidence integration.
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{fig4_calibration.png}
+\caption{Calibration reliability comparison.}
+\label{fig:calibration}
+\end{figure}
 
-\subsection{Complexity \& Latency}
-The temporal fusion pipeline (IIM, PAM, LDD, and RFE) operates at $28.45$ ms/frame on CPU, utilizing $85\%$ of a 30fps budget. IDE requires GPU deployment ($<5$ms) or backbone substitution for production.
+The full four-signal configuration achieves ROC-AUC 0.9987. Removal of LDD produces the largest performance degradation, indicating unique contribution of long-horizon modeling.
 
-% ---------------------------------------------------
-\section{Discussion, Ethics, and Limitations}
+% ============================================================
+\section{Discussion}
 
-\subsection{Discussion}
-Ablating LDD produces the largest reduction because it is the only component accumulating 120 frames of embedding displacement. Short-window models completely miss slow substitution drift. Additionally, threshold-based heuristics cannot integrate weak, overlapping, temporally correlated evidence into shared probabilistic confidence, explaining the large performance gap separating our GRU from the rule-based baselines.
+Temporal modeling enables accumulation of weak but consistent deviations. The GRU-based RFE achieves superior calibration and smoother trajectories compared to non-temporal baselines.
 
-\subsection{Ethical Considerations}
-The system produces continuous risk probabilities rather than binary verdicts, preventing automatic disqualifier bias. The one-shot constraint enforces privacy: the identity template is fixed and no behavioral profile is adaptively built during the session.
+% ============================================================
+\section{Ethical Considerations}
 
-\subsection{Limitations}
-Evaluation relies on procedurally generated sessions. Real-world validation is required. Second, ResNet-50 inference ($47$ms/frame) may require backbone substitution for strict real-time CPU deployment.
+The system outputs calibrated probabilities rather than binary decisions. High-risk sessions should trigger human review rather than automatic disqualification. The one-shot constraint reduces persistent biometric storage.
 
-% ---------------------------------------------------
+% ============================================================
+\section{Limitations}
+
+Evaluation relies on procedurally generated sessions. Real-world annotated datasets are required for further validation. ResNet-50 latency may require backbone substitution for real-time CPU deployment.
+
+% ============================================================
 \section{Conclusion}
-We present a multi-signal probabilistic online proctoring framework that categorically outperforms threshold-based rules (ROC-AUC 0.9987 vs 0.8212). Temporal tracking over full continuous sessions paired with long-horizon drift detection allows the model to capture sophisticated attacks while preserving architectural invariants.
 
+We presented a probabilistic, temporally modeled proctoring framework integrating identity, behavioral, and drift signals under strict one-shot constraints. Experimental results demonstrate strong discrimination and calibration while preserving architectural invariants.
+
+% ============================================================
 \begin{thebibliography}{00}
-\bibitem{Nigam2020} T. Nigam, "Automatic Proctoring System Using Machine Learning," arXiv:2004.01399, 2020.
-\bibitem{Atoum2017} O. Atoum et al., "Automated Online Exam Proctoring," IEEE TMM, 2017.
-\bibitem{Schroff2015} F. Schroff et al., "FaceNet: A Unified Embedding for Face Recognition," CVPR, 2015.
-\bibitem{Dewan2019} M. A. A. Dewan et al., "Engagement Detection in Online Learning: A Review," Smart Learning Environments, 2019.
-\bibitem{Liu2018} W. Liu et al., "Future Frame Prediction for Anomaly Detection," CVPR, 2018.
-\bibitem{Mahoney2003} M. V. Mahoney and P. K. Chan, "Learning Rules for Anomaly Detection of Hostile Network Traffic," ICDM, 2003.
-\bibitem{Deng2019} J. Deng et al., "ArcFace: Additive Angular Margin Loss for Deep Face Recognition," CVPR, 2019.
-\bibitem{Wang2018} H. Wang et al., "CosFace: Large Margin Cosine Loss for Deep Face Recognition," CVPR, 2018.
+
+\bibitem{facenet} F. Schroff, D. Kalenichenko, and J. Philbin, ``FaceNet: A Unified Embedding for Face Recognition,'' in CVPR, 2015.
+
+\bibitem{arcface} J. Deng et al., ``ArcFace: Additive Angular Margin Loss for Deep Face Recognition,'' in CVPR, 2019.
+
+\bibitem{cosface} H. Wang et al., ``CosFace: Large Margin Cosine Loss for Deep Face Recognition,'' in CVPR, 2018.
+
 \end{thebibliography}
 
 \end{document}
