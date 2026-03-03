@@ -184,26 +184,26 @@ def fig6_architecture():
     # ── Layer 2: Temporal Modeling ──
     draw_group_box(ax, 5, 4.3, 9.5, 2.4, "Temporal Modeling Layer")
     
-    draw_rounded_rect(ax, 2.0, 4.3, 2.4, 1.2, "UC2: Instability\n(LSTM, window $W$)")
-    draw_rounded_rect(ax, 5.0, 4.3, 2.4, 1.2, "UC4: Drift\n(Bi-LSTM, 120-buf)")
-    draw_rounded_rect(ax, 8.0, 4.3, 2.4, 1.2, "UC3: Presence\n(Bi-LSTM, window $W$)")
+    draw_rounded_rect(ax, 2.0, 4.3, 2.4, 1.2, "IIM: Instability\n(LSTM, window $W$)")
+    draw_rounded_rect(ax, 5.0, 4.3, 2.4, 1.2, "LDD: Drift\n(Bi-LSTM, 120-buf)")
+    draw_rounded_rect(ax, 8.0, 4.3, 2.4, 1.2, "PAM: Presence\n(Bi-LSTM, window $W$)")
     
     # Routing into Layer 2
-    # S_t -> UC2
+    # S_t -> IIM
     pth = [(5.0, 6.4), (5.0, 5.8), (2.0, 5.8), (2.0, 4.9)]
     x, y = zip(*pth)
     ax.plot(x, y, color='black', lw=1.2, zorder=2)
     ax.annotate('', xy=(2.0, 4.9), xytext=(2.0, 5.0), arrowprops=dict(arrowstyle='->', color='black', mutation_scale=10))
     ax.text(2.6, 5.8, "Similarity seq $S_t$", ha='center', va='center', fontsize=8, bbox=dict(facecolor='white', edgecolor='none', pad=0))
 
-    # delta -> UC4
+    # delta -> LDD
     pth = [(5.0, 6.4), (5.0, 4.9)]
     x, y = zip(*pth)
     ax.plot(x, y, color='black', lw=1.2, zorder=2)
     ax.annotate('', xy=(5.0, 4.9), xytext=(5.0, 5.0), arrowprops=dict(arrowstyle='->', color='black', mutation_scale=10))
     ax.text(5.5, 5.8, "Delta seq $\\delta_t$", ha='center', va='center', fontsize=8, bbox=dict(facecolor='white', edgecolor='none', pad=0))
 
-    # Live frame -> 6D Features -> UC3
+    # Live frame -> 6D Features -> PAM
     draw_rect(ax, 8.0, 5.7, 2.0, 0.4, "6D Extractor", ls='--', fc='#f8f8f8')
     orth_arrow(ax, (8.5, 8.7), (8.5, 5.9)) # tap from frame
     orth_arrow(ax, (8.0, 5.5), (8.0, 4.9), label="6D seq", text_offset=(0.6, 0))
@@ -211,7 +211,7 @@ def fig6_architecture():
     # ── Layer 3: Risk Fusion ──
     draw_group_box(ax, 5, 1.6, 9.5, 2.0, "Session Risk Fusion (Probabilistic)")
     
-    draw_rounded_rect(ax, 5.0, 1.6, 3.5, 1.0, "UC5: GRU Fusion Engine\n(Session-level BCE Supervision)", bold=True)
+    draw_rounded_rect(ax, 5.0, 1.6, 3.5, 1.0, "RFE: GRU Fusion Engine\n(Session-level BCE Supervision)", bold=True)
     
     # Routing into Layer 3
     orth_arrow(ax, (2.0, 3.7), (4.0, 2.1))
@@ -223,7 +223,7 @@ def fig6_architecture():
     orth_arrow(ax, (8.0, 3.7), (6.0, 2.1))
     ax.text(7.5, 2.9, "Presence $P_t$", fontsize=8, style='italic', bbox=dict(facecolor='white', edgecolor='none', pad=1))
     
-    # S_t direct leak to UC5
+    # S_t direct leak to RFE
     pth = [(4.1, 6.7), (0.4, 6.7), (0.4, 1.6), (3.25, 1.6)]
     x, y = zip(*pth)
     ax.plot(x, y, color='black', lw=1.0, ls=':', zorder=2)
@@ -276,10 +276,10 @@ def fig7_workflow():
     draw_rect(ax, cx, 7.5, 4.5, 0.8, "Extract Probe $e_t$\nCompute $S_t = e_t \\cdot e_0$, $\\delta_t = e_t - e_0$")
     orth_arrow(ax, (cx, 8.3), (cx, 7.9))
     
-    draw_rect(ax, cx, 6.4, 4.5, 0.8, "Update Temporal Windows\nUC2($S_t$), UC3(6D), UC4($\\delta_t$)")
+    draw_rect(ax, cx, 6.4, 4.5, 0.8, "Update Temporal Windows\nIIM($S_t$), PAM(6D), LDD($\\delta_t$)")
     orth_arrow(ax, (cx, 7.1), (cx, 6.8))
     
-    draw_rect(ax, cx, 5.3, 4.5, 0.8, "Update Risk State\nUC5 GRU: $\\rho_t = f(S_t, I_t, P_t, D_t)$")
+    draw_rect(ax, cx, 5.3, 4.5, 0.8, "Update Risk State\nRFE GRU: $\\rho_t = f(S_t, I_t, P_t, D_t)$")
     orth_arrow(ax, (cx, 6.0), (cx, 5.7))
     
     draw_diamond(ax, cx, 4.1, 2.5, 1.0, "Is $t == T$ ?")

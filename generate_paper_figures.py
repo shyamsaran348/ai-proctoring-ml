@@ -50,10 +50,10 @@ os.makedirs(OUT_DIR, exist_ok=True)
 def fig1_ablation():
     models = [
         'Full 4-Signal\n(Baseline)',
-        'Ablate UC1\n(No Identity)',
-        'Ablate UC2\n(No Instability)',
-        'Ablate UC3\n(No Presence)',
-        'Ablate UC4\n(No Drift)',
+        'Ablate IDE\n(No Identity)',
+        'Ablate IIM\n(No Instability)',
+        'Ablate PAM\n(No Presence)',
+        'Ablate LDD\n(No Drift)',
     ]
     aucs = [0.9987, 0.9972, 0.9921, 0.9923, 0.9547]
     deltas = [0.0, -0.0015, -0.0066, -0.0064, -0.0440]
@@ -78,8 +78,8 @@ def fig1_ablation():
     ax.invert_yaxis()
     ax.legend(loc='lower right', fontsize=9)
 
-    # Annotate UC4 impact
-    ax.annotate('6.7× largest drop\nwhen UC4 removed',
+    # Annotate LDD impact
+    ax.annotate('6.7× largest drop\nwhen LDD removed',
                 xy=(0.9547, 4), xytext=(0.960, 3.5),
                 arrowprops=dict(arrowstyle='->', color=PALETTE['danger'], lw=1.5),
                 fontsize=9, color=PALETTE['danger'], ha='center')
@@ -287,8 +287,8 @@ def fig5_architecture():
     # ── Frame input
     draw_box(ax, 0.01, 0.42, 0.13, 0.16, 'Frame fₜ', 'Camera Input', color='#0f172a')
 
-    # ── UC1
-    draw_box(ax, 0.20, 0.65, 0.20, 0.16, 'UC1', 'ResNet-50\nEmbedder', color=PALETTE['primary'])
+    # ── IDE
+    draw_box(ax, 0.20, 0.65, 0.20, 0.16, 'IDE', 'ResNet-50\nEmbedder', color=PALETTE['primary'])
     arrow(ax, 0.14, 0.50, 0.20, 0.73)
 
     # ── e0 (enrollment)
@@ -301,24 +301,24 @@ def fig5_architecture():
     # delta arrow
     arrow(ax, 0.40, 0.43, 0.60, 0.50, 'δₜ = eₜ - e₀')
 
-    # ── UC2
-    draw_box(ax, 0.46, 0.65, 0.18, 0.16, 'UC2', 'LSTM\nInstability', color=PALETTE['accent2'])
+    # ── IIM
+    draw_box(ax, 0.46, 0.65, 0.18, 0.16, 'IIM', 'LSTM\nInstability', color=PALETTE['accent2'])
     arrow(ax, 0.64, 0.73, 0.70, 0.73, 'Iₜ')
 
-    # ── UC3
-    draw_box(ax, 0.46, 0.43, 0.18, 0.16, 'UC3', 'Bi-LSTM\nPresence', color=PALETTE['success'])
+    # ── PAM
+    draw_box(ax, 0.46, 0.43, 0.18, 0.16, 'PAM', 'Bi-LSTM\nPresence', color=PALETTE['success'])
     ax.text(0.455, 0.41, '← 6D features (pose/motion)', fontsize=7.5, color=PALETTE['success'])
     arrow(ax, 0.64, 0.51, 0.70, 0.55, 'Pₜ')
 
-    # ── UC4
-    draw_box(ax, 0.46, 0.21, 0.18, 0.16, 'UC4', 'Bi-LSTM\nDrift (120-frame)', color=PALETTE['accent1'])
+    # ── LDD
+    draw_box(ax, 0.46, 0.21, 0.18, 0.16, 'LDD', 'Bi-LSTM\nDrift (120-frame)', color=PALETTE['accent1'])
     arrow(ax, 0.64, 0.29, 0.70, 0.39, 'Dₜ')
 
-    # Sₜ also goes to UC5
+    # Sₜ also goes to RFE
     arrow(ax, 0.64, 0.73, 0.70, 0.65)
 
-    # ── UC5 Risk Fusion
-    draw_box(ax, 0.70, 0.35, 0.18, 0.36, 'UC5', 'GRU\nRisk Fusion', color=PALETTE['dark'])
+    # ── RFE Risk Fusion
+    draw_box(ax, 0.70, 0.35, 0.18, 0.36, 'RFE', 'GRU\nRisk Fusion', color=PALETTE['dark'])
 
     # ── Risk output
     draw_box(ax, 0.92, 0.44, 0.07, 0.18, 'ρₜ', '[0,1] Risk', color=PALETTE['danger'])
