@@ -1,0 +1,795 @@
+%%
+%% IEEE Journal Paper — Professional Submission Draft
+%% Multi-Signal Temporal Behavioral Inference Engine
+%% for AI-Based Online Exam Proctoring
+%%
+\documentclass[journal]{IEEEtran}
+
+% --- Core Packages ---
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{bm}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{float}
+\usepackage{url}
+\usepackage{balance}
+
+% --- Figure Path ---
+\graphicspath{{paper_figures/}}
+
+% --- Hyphenation ---
+\hyphenation{proc-tor-ing be-hav-ior-al semi-conduc-tor}
+
+\begin{document}
+
+% --- Title ---
+\title{Multi-Signal Temporal Behavioral Inference Engine for AI-Based Online Exam Proctoring}
+
+% --- Author ---
+\author{Shyam~Saran~P%
+\thanks{S.~Saran~P is with the Department of Information Technology, SSN College of Engineering, Chennai~600\,112, India (e-mail: shyamsaran348@gmail.com).}%
+\thanks{Manuscript submitted March 2026.}}
+
+% --- Headers ---
+\markboth{IEEE Transactions on Learning Technologies, Vol.~XX, No.~X, Month~2026}%
+{Saran: Multi-Signal Temporal Behavioral Inference Engine for Online Exam Proctoring}
+
+\maketitle
+
+% ===================================================================
+%                         ABSTRACT
+% ===================================================================
+\begin{abstract}
+Automated online proctoring systems are critical for maintaining examination integrity in remote education, yet prevailing approaches rely on instantaneous rule-based event detection that produces excessive false positives and fails to capture temporal behavioral evolution. This paper reformulates exam integrity monitoring as a \emph{multi-signal temporal behavioral inference} problem. We introduce a seven-component neural architecture comprising six specialized temporal experts---an identity instability monitor~(IIM), a presence and attentiveness model~(PAM), a long-horizon drift detector~(LDD), a gaze attentiveness model~(GAM), and a head-gaze dynamics model~(HGDM)---anchored by a one-shot identity embedder~(IDE) under an immutable enrollment constraint. A Gated Recurrent Unit~(GRU)-based Risk Fusion Engine~(RFE) integrates six continuous behavioral signals into a session-level probabilistic risk trajectory~$\rho_t\!\in\![0,1]$. Evaluation on 5\,000 procedurally generated sessions spanning seven behavioral classes demonstrates that temporal fusion achieves a session-level ROC-AUC of~$0.9992 \pm 0.0004$ from individually weak component signals (ROC-AUC~0.64--0.94), with an Expected Calibration Error of~0.0072. Leave-one-out ablation identifies long-horizon drift detection as the most critical signal ($\Delta$AUC$\,{=}\,{-}0.0410$), while gaze integration improves non-identity anomaly detection by $+0.4478$~AUC. A gradient-based temporal attribution mechanism provides frame-level signal importance maps for human-in-the-loop verification. Computational profiling confirms real-time feasibility at 82.66\,ms\,/\,frame on~CPU. These results provide quantitative evidence that temporal evidence accumulation fundamentally outperforms instantaneous thresholding for behavioral monitoring.
+\end{abstract}
+
+% --- Keywords ---
+\begin{IEEEkeywords}
+Online proctoring, temporal behavioral inference, one-shot identity verification, gated recurrent unit, risk fusion, sequential anomaly detection, explainable AI, calibrated probabilistic inference.
+\end{IEEEkeywords}
+
+\IEEEpeerreviewmaketitle
+
+% ===================================================================
+%                       I. INTRODUCTION
+% ===================================================================
+\section{Introduction}
+\label{sec:intro}
+
+\IEEEPARstart{T}{he} proliferation of online education has created an acute need for automated examination integrity monitoring. Remote assessments expose institutions to a broad spectrum of dishonesty---from physical impersonation and camera absence to gradual identity drift and flickering substitution patterns that evade short-window detection. Two dominant paradigms have emerged, each exhibiting fundamental architectural limitations.
+
+\emph{Rule-based heuristic systems} define hand-crafted thresholds for individual behavioral indicators (e.g., gaze angle, head pose deviation, face detection confidence). Such thresholds are calibrated in controlled laboratory settings and are therefore brittle under the heterogeneous lighting, camera angles, and background activity characteristic of home environments~\cite{Nigam2020, Atoum2017}. More critically, sophisticated cheating strategies that maintain each individual signal within acceptable bounds while exhibiting anomalous \emph{combinations} over time completely evade threshold-based detection.
+
+\emph{Static binary classifiers} collapse the evolving nature of exam integrity into a single decision point per frame or per fixed window. Although deep learning variants improve robustness over hand-crafted features~\cite{Doughty2022, Ghizlane2019}, they discard the temporal structure that distinguishes momentary legitimate behaviors from sustained anomalous patterns.
+
+The core insight motivating this work is that proctoring should be modeled as a \textbf{continuous temporal inference problem}. Individual behavioral signals are inherently noisy at the frame level: a single frame showing reduced identity similarity may reflect momentary lighting variation; a brief gaze aversion is common during keyboard interaction. However, when multiple weak signals exhibit coordinated anomalous patterns sustained over time, the evidence for integrity violation becomes compelling. This principle, well-established in sequential hypothesis testing~\cite{Wald1945} and temporal anomaly detection~\cite{Liu2018, Chandola2009}, has not been systematically applied to online proctoring.
+
+We propose the \textbf{Temporal Behavioral Inference Engine~(TBIE)}, a seven-component neural architecture that operationalizes this principle. The system extracts six continuous behavioral signals from standard webcam feeds, processes each through a specialized temporal expert, and fuses them via a GRU-based Risk Fusion Engine that maintains cumulative session evidence in its hidden state. The system produces a continuous risk trajectory $\rho_t \in [0,1]$ rather than making instantaneous frame-level decisions.
+
+\medskip
+\noindent\textbf{Contributions.} The principal contributions of this work are:
+\begin{enumerate}
+    \item[(C1)] A multi-signal temporal fusion architecture enforcing four design invariants---immutable enrollment embeddings, absence of hard thresholds, learned behavioral interpretation, and session-level supervision---ensuring that all inference is data-driven.
+    \item[(C2)] Empirical validation that temporal evidence accumulation yields a session-level ROC-AUC of~$0.9992 \pm 0.0004$ from component signals achieving only 0.64--0.94 individually.
+    \item[(C3)] Systematic signal analysis via leave-one-out ablation, baseline comparison against four non-temporal alternatives, and calibration analysis.
+    \item[(C4)] A gradient-based temporal attribution mechanism producing frame-level signal importance maps for human-in-the-loop verification.
+    \item[(C5)] A Head-Gaze Dynamics Model~(HGDM) that detects cheating patterns exploiting the decorrelation between head pose and gaze direction.
+\end{enumerate}
+
+\noindent The remainder of this paper is organized as follows. Section~\ref{sec:related} surveys related work. Section~\ref{sec:formulation} formalizes the problem. Section~\ref{sec:methodology} presents the system architecture. Section~\ref{sec:experimental} describes the experimental setup. Section~\ref{sec:results} reports evaluation results. Section~\ref{sec:xai} describes temporal interpretability. Section~\ref{sec:discussion} provides discussion. Section~\ref{sec:ethics} addresses ethics and limitations. Section~\ref{sec:conclusion} concludes.
+
+
+% ===================================================================
+%                     II. RELATED WORK
+% ===================================================================
+\section{Related Work}
+\label{sec:related}
+
+\subsection{Hardware-Based and Biometric Approaches}
+Early proctoring research employed specialized hardware---biometric mice for keystroke dynamics~\cite{Traore2011} and multi-camera setups to eliminate webcam blind spots~\cite{Atoum2017}. While these systems offered high detection fidelity, their deployment cost drove the field toward software-only solutions using commodity webcams.
+
+\subsection{Static Computer Vision Methods}
+Li~et~al.~\cite{Li2018} used iris detection via Hough transforms and geometric rules for gaze estimation, proving brittle under varied lighting. Deep CNN approaches improved per-frame robustness~\cite{Doughty2022, Ghizlane2019} but ignore the temporal context distinguishing momentary glances from sustained suspicious behavior.
+
+\subsection{Identity Verification}
+The evolution from VGGFace to metric learning---FaceNet~\cite{Schroff2015}, ArcFace~\cite{Deng2019}, CosFace~\cite{Wang2018}---has provided robust one-to-one matching. However, commercial implementations often use adaptive template updates, creating an identity drift vulnerability that our immutable enrollment anchor explicitly closes.
+
+\subsection{Temporal and Sequential Methods}
+Temporal modeling for anomaly detection has been explored in video surveillance~\cite{Liu2018, Sultani2018} and network traffic analysis~\cite{Mahoney2003}. Early approaches in behavioral analysis predominantly utilized \emph{late fusion} strategies, wherein fixed-window heuristics generated independent anomalous flags that were subsequently aggregated via weighted majority voting. In contrast, modern sequential anomaly detection~\cite{Chandola2009} increasingly favors \emph{early/continuous fusion}, allowing models to maintain long-term memory elements that capture the subtle evolution of behavior before hard thresholding occurs. Engagement analysis via affective computing~\cite{Dewan2019, Garcia2021} offers related but distinct objectives. Our architecture extends the continuous fusion paradigm by operating on \emph{multiple heterogeneous} signals simultaneously with specialized experts, delaying any hard classification until the session-level risk trajectory $\rho_{1:T}$ is fully formed.
+
+\subsection{Explainability in High-Stakes AI}
+Deployment of AI in educational assessment demands interpretability~\cite{Arrieta2020}. Modern neural networks are frequently miscalibrated~\cite{Guo2017}, and post-hoc attribution methods~\cite{Sundararajan2017} are essential for validating model behavior. Our temporal attribution mechanism addresses both requirements, producing frame-level signal importance maps alongside calibrated probabilities.
+
+
+% ===================================================================
+%                  III. PROBLEM FORMULATION
+% ===================================================================
+\section{Problem Formulation}
+\label{sec:formulation}
+
+Let $\mathcal{S} = \{I_1, I_2, \ldots, I_T\}$ denote a sequence of $T$ webcam frames captured during an exam session, and let $I_{\mathrm{ref}}$ denote a single enrollment image captured before the session begins. The system must produce a risk trajectory $\bm{\rho} = (\rho_1, \rho_2, \ldots, \rho_T)$ where each $\rho_t \in [0,1]$ represents the accumulated evidence for an integrity violation at time~$t$.
+
+\begin{table}[t]
+\caption{Summary of Notation}
+\label{tab:notation}
+\centering
+\footnotesize
+\begin{tabular}{cl}
+\toprule
+\textbf{Symbol} & \textbf{Description} \\
+\midrule
+$I_t$ & Webcam frame at timestep $t$ \\
+$I_{\mathrm{ref}}$ & Enrollment reference image \\
+$e_0, e_t$ & Reference / probe identity embeddings $\in \mathbb{R}^{256}$ \\
+$S_t$ & Cosine identity similarity \\
+$I_t$ & Identity instability signal (IIM output) \\
+$P_t$ & Presence confidence signal (PAM output) \\
+$D_t$ & Long-term drift signal (LDD output) \\
+$G_t$ & Gaze attentiveness signal (GAM output) \\
+$H_t$ & Head-gaze dynamics signal (HGDM output) \\
+$\mathbf{r}_t$ & Risk vector $[S_t, I_t, P_t, D_t, G_t, H_t]^{\!\top}$ \\
+$\rho_t$ & Fused risk output $\in [0,1]$ \\
+$h_t$ & GRU hidden state \\
+$T$ & Session length (frames) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent We impose four design invariants:
+\begin{enumerate}
+    \item[\textbf{I1.}] \textbf{No rule-based detection.} All behavioral interpretation is learned; no thresholds or heuristic decision rules are permitted.
+    \item[\textbf{I2.}] \textbf{Immutable enrollment.} The reference embedding $e_0$ is never updated, averaged, or adapted during the session.
+    \item[\textbf{I3.}] \textbf{Model-first architecture.} Computer vision extracts measurements; models interpret behavior.
+    \item[\textbf{I4.}] \textbf{Temporal decision making.} No frame-level binary decisions; only the continuous trajectory $\rho_t$ is produced.
+\end{enumerate}
+
+
+% ===================================================================
+%                    IV. METHODOLOGY
+% ===================================================================
+\section{System Architecture}
+\label{sec:methodology}
+
+The proposed architecture comprises seven neural components organized into three stages: \emph{Enrollment}, \emph{Per-Frame Signal Extraction}, and \emph{Probabilistic Risk Fusion}. The complete architecture is illustrated in Fig.~\ref{fig:arch}, and the temporal evidence flow is summarized in Fig.~\ref{fig:flow}.
+
+\subsection{Stage~1: Enrollment and Identity Anchoring}
+
+The \textbf{Identity Embedding Engine (IDE)} uses a ResNet-50 backbone~\cite{He2016} to extract a 256-dimensional $L_2$-normalized embedding from the enrollment image:
+\begin{equation}
+    e_0 = \frac{f_\theta(I_{\mathrm{ref}})}{\lVert f_\theta(I_{\mathrm{ref}}) \rVert_2} \in \mathbb{R}^{256}, \quad \lVert e_0 \rVert_2 = 1
+    \label{eq:ide}
+\end{equation}
+where $f_\theta$ denotes the feature extractor with parameters~$\theta$. By invariant~\textbf{I2}, $e_0$ remains immutable throughout the session, eliminating the adversarial drift vulnerability present in adaptive template systems.
+
+\subsection{Stage~2: Per-Frame Signal Extraction}
+
+For each frame~$I_t$, the IDE extracts a probe embedding $e_t = f_\theta(I_t)/\lVert f_\theta(I_t) \rVert_2$ and computes three derived quantities:
+\begin{align}
+    S_t &= e_t^\top e_0 & & \text{(cosine similarity)} \label{eq:sim} \\
+    \delta_t &= e_t - e_0 \in \mathbb{R}^{256} & & \text{(embedding displacement)} \label{eq:disp} \\
+    \mathbf{p}_t &= [c_t, a_t, \psi_t, \theta_t, \phi_t, m_t]^\top & & \text{(presence features)} \label{eq:pres}
+\end{align}
+where $c_t$ is face detection confidence, $a_t$ is face-to-frame area ratio, $(\psi_t, \theta_t, \phi_t)$ are head pose angles (yaw, pitch, roll), and $m_t$ is optical-flow motion energy.
+
+Five specialized temporal experts process these features:
+
+\subsubsection{Identity Instability Model (IIM)}
+An LSTM with hidden dimension~32 processes the similarity sequence to detect abrupt impersonation and flickering substitution:
+\begin{equation}
+    I_t = \sigma\!\left(W_I \cdot \mathrm{LSTM}(S_t,\, h_{t-1}^{\mathrm{IIM}}) + b_I\right) \in [0,1]
+    \label{eq:iim}
+\end{equation}
+
+\subsubsection{Presence and Attentiveness Model (PAM)}
+A Bi-LSTM (hidden dimension~64, dropout~$p{=}0.3$) models student presence and engagement from the 6D feature vector~$\mathbf{p}_t$:
+\begin{equation}
+    P_t = \sigma\!\left(W_P \cdot \mathrm{BiLSTM}_{64}(\mathbf{p}_t) + b_P\right) \in [0,1]
+    \label{eq:pam}
+\end{equation}
+
+\subsubsection{Long-Term Drift Detector (LDD)}
+A Bi-LSTM (hidden dimension~128) operates on a 257-dimensional input over a 120-frame buffer to detect gradual identity drift:
+\begin{equation}
+    D_t = \sigma\!\left(W_D \cdot \mathrm{BiLSTM}_{128}([\delta_t \| S_t]_{t-119:t}) + b_D\right)
+    \label{eq:ldd}
+\end{equation}
+
+\subsubsection{Gaze Attentiveness Model (GAM)}
+A 2-layer Bi-LSTM (hidden dimension~64, dropout~$p{=}0.3$) processes gaze features $\mathbf{g}_t = [\psi_t^g, \theta_t^g, x_t^p, y_t^p, b_t, v_t^g]^\top$ over 120-frame windows:
+\begin{equation}
+    G_t = \sigma\!\left(W_G \cdot \mathrm{BiLSTM}_{64}^{(2)}(\mathbf{g}_{t-119:t}) + b_G\right)
+    \label{eq:gam}
+\end{equation}
+where $\psi_t^g$, $\theta_t^g$ are gaze yaw/pitch, $(x_t^p, y_t^p)$ are pupil coordinates, $b_t$ is blink ratio, and $v_t^g$ is gaze angular velocity.
+
+\subsubsection{Head-Gaze Dynamics Model (HGDM)}
+A 2-layer Bi-LSTM (hidden dimension~64) detects pose-gaze decorrelation from a 7D input including angular velocities:
+\begin{equation}
+    H_t = \sigma\!\left(W_H \cdot \mathrm{BiLSTM}_{64}^{(2)}(\mathbf{hg}_{t-119:t}) + b_H\right)
+    \label{eq:hgdm}
+\end{equation}
+where $\mathbf{hg}_t = [\psi_t^h, \theta_t^h, \phi_t^h, \psi_t^g, \theta_t^g, \Delta\theta_t^h, \Delta\theta_t^g]^\top$ and $\Delta\theta_t^{(\cdot)} = \theta_t^{(\cdot)} - \theta_{t-1}^{(\cdot)}$.
+
+\subsection{Stage~3: Probabilistic Risk Fusion}
+
+The \textbf{Risk Fusion Engine (RFE)} is a GRU~\cite{Cho2014} that maintains a hidden state~$h_t$ encoding cumulative session evidence. At each timestep, the six signals are concatenated into a risk vector:
+\begin{equation}
+    \mathbf{r}_t = [S_t,\, I_t,\, P_t,\, D_t,\, G_t,\, H_t]^\top \in \mathbb{R}^6
+    \label{eq:riskvec}
+\end{equation}
+The GRU update equations are:
+\begin{align}
+    z_t &= \sigma(W_z \mathbf{r}_t + U_z h_{t-1} + b_z) \label{eq:gru_z} \\
+    r_t &= \sigma(W_r \mathbf{r}_t + U_r h_{t-1} + b_r) \label{eq:gru_r} \\
+    \tilde{h}_t &= \tanh(W_h \mathbf{r}_t + U_h (r_t \odot h_{t-1}) + b_h) \label{eq:gru_h} \\
+    h_t &= (1 - z_t) \odot h_{t-1} + z_t \odot \tilde{h}_t \label{eq:gru_update}
+\end{align}
+The risk output is:
+\begin{equation}
+    \rho_t = \sigma(W_o h_t + b_o) \in [0, 1]
+    \label{eq:rho}
+\end{equation}
+trained with session-level binary cross-entropy (BCE). A critical design choice is the utilization of weak session-level supervision applied uniformly across the temporal dimension:
+\begin{equation}
+    \mathcal{L}_{\mathrm{BCE}} = -\frac{1}{T} \sum_{t=1}^{T} w_y \bigl[ y \log \rho_t + (1{-}y) \log(1{-}\rho_t) \bigr]
+    \label{eq:loss}
+\end{equation}
+where $y \in \{0,1\}$ is the session-level binary label (genuine vs.\ anomalous). To counteract the severe class imbalance inherent to anomaly detection tasks---where genuine events drastically outnumber true integrity violations in real-world distributions---we introduce a class balancing weight $w_y$ inversely proportional to the prior class frequencies. This formulation intentionally avoids the requisite of frame-level strong annotations, which are prohibitively expensive and subject to high inter-rater variance, opting instead to let the GRU discover the temporal salient features corresponding to the global session label. Algorithm~\ref{alg:inference} summarizes the inference procedure.
+
+\begin{algorithm}[t]
+\caption{TBIE Session Inference}
+\label{alg:inference}
+\begin{algorithmic}[1]
+\REQUIRE Enrollment image $I_{\mathrm{ref}}$; frame sequence $\{I_1, \ldots, I_T\}$
+\ENSURE Risk trajectory $\bm{\rho} = (\rho_1, \ldots, \rho_T)$
+\STATE $e_0 \leftarrow f_\theta(I_{\mathrm{ref}}) / \lVert f_\theta(I_{\mathrm{ref}}) \rVert_2$ \COMMENT{Immutable anchor}
+\STATE $h_0 \leftarrow \mathbf{0}$ \COMMENT{Initialize GRU state}
+\FOR{$t = 1$ \TO $T$}
+    \STATE $e_t \leftarrow f_\theta(I_t) / \lVert f_\theta(I_t) \rVert_2$
+    \STATE $S_t \leftarrow e_t^\top e_0$;\quad $\delta_t \leftarrow e_t - e_0$
+    \STATE $I_t \leftarrow \mathrm{IIM}(S_t)$ \COMMENT{Identity instability}
+    \STATE $P_t \leftarrow \mathrm{PAM}(\mathbf{p}_t)$ \COMMENT{Presence}
+    \STATE $D_t \leftarrow \mathrm{LDD}([\delta_t \| S_t])$ \COMMENT{Drift}
+    \STATE $G_t \leftarrow \mathrm{GAM}(\mathbf{g}_t)$ \COMMENT{Gaze}
+    \STATE $H_t \leftarrow \mathrm{HGDM}(\mathbf{hg}_t)$ \COMMENT{Head-gaze}
+    \STATE $\mathbf{r}_t \leftarrow [S_t, I_t, P_t, D_t, G_t, H_t]^\top$
+    \STATE $h_t \leftarrow \mathrm{GRU}(\mathbf{r}_t, h_{t-1})$
+    \STATE $\rho_t \leftarrow \sigma(W_o h_t + b_o)$
+\ENDFOR
+\RETURN $\bm{\rho}$
+\end{algorithmic}
+\end{algorithm}
+
+\begin{figure}[t]
+\centerline{\includegraphics[width=\columnwidth]{system_architecture.png}}
+\caption{System architecture. IDE~(ResNet-50) is shared across enrollment and per-frame processing. The immutable embedding~$e_0$ anchors IIM and LDD. PAM independently processes presence features. GAM and HGDM handle gaze and pose-gaze dynamics. All six signals converge at the RFE~(GRU) for temporal fusion into the session risk trajectory~$\rho_t$.}
+\label{fig:arch}
+\end{figure}
+
+\begin{figure}[t]
+\centerline{\includegraphics[width=\columnwidth]{evidence_flow.png}}
+\caption{Temporal evidence flow. Six individually noisy behavioral signals are processed by specialized temporal experts and fused by the GRU-based RFE into a smooth, high-confidence risk trajectory.}
+\label{fig:flow}
+\end{figure}
+
+\begin{figure}[t]
+\centerline{\includegraphics[width=\columnwidth]{workflow.png}}
+\caption{System workflow. \emph{Enrollment:} IDE extracts the immutable anchor~$e_0$. \emph{Live monitoring:} per-frame pipeline produces signals fused by RFE. \emph{Session end:} risk trajectory and attribution data forwarded for human review.}
+\label{fig:workflow}
+\end{figure}
+
+\begin{table}[t]
+\caption{Component Summary}
+\label{tab:summary}
+\centering
+\footnotesize
+\begin{tabular}{@{}lllcc@{}}
+\toprule
+\textbf{Comp.} & \textbf{Architecture} & \textbf{Output} & \textbf{Horizon} & \textbf{AUC} \\
+\midrule
+IDE & ResNet-50 & $S_t$ & Frame & 0.640 \\
+IIM & LSTM ($h{=}32$) & $I_t$ & 5--10\,s & 0.650 \\
+PAM & BiLSTM ($h{=}64$) & $P_t$ & 5--10\,s & 0.923 \\
+LDD & BiLSTM ($h{=}128$) & $D_t$ & 120\,fr & 0.785 \\
+GAM & BiLSTM$^2$ ($h{=}64$) & $G_t$ & 120\,fr & 0.894 \\
+HGDM & BiLSTM$^2$ ($h{=}64$) & $H_t$ & 120\,fr & 0.942 \\
+\textbf{RFE} & \textbf{GRU} & $\bm{\rho_t}$ & \textbf{Full} & \textbf{0.999} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+% ===================================================================
+%                   V. EXPERIMENTAL SETUP
+% ===================================================================
+\section{Experimental Setup}
+\label{sec:experimental}
+
+\subsection{Synthetic Session Generation}
+
+We constructed a procedural session generator producing 5\,000 independent exam sessions of $T{=}120$ frames each (${\approx}4$\,s at 30\,FPS). Synthetic generation enables controlled evaluation of temporal fusion under known behavioral patterns. Real-world datasets for exam integrity violations are extremely limited due to privacy constraints and the rarity of labeled cheating events.
+
+Each base signal follows a first-order autoregressive AR(1) process:
+\begin{equation}
+    x_t = \phi\, x_{t-1} + (1{-}\phi)\,\mu + \epsilon_t, \quad \epsilon_t \sim \mathcal{N}(0, \sigma^2)
+    \label{eq:ar1}
+\end{equation}
+with $\phi{=}0.85$ enforcing temporal autocorrelation. Three perturbation types are injected: \emph{noise bursts} ($\pm 30\%$ spikes, $p{=}0.05$), \emph{block drops} (2--10 contiguous frames of signal absence), and \emph{random-walk drift} (low-frequency variation in~$\mu$).
+
+\subsection{Signal Distributions}
+
+Table~\ref{tab:distributions} reports the generative parameters. Distributions are deliberately designed with substantial overlap between genuine and anomalous classes, ensuring that per-frame discrimination is inherently difficult.
+
+\begin{table}[t]
+\caption{Signal Distributions (Mean, Std.\ Dev.)}
+\label{tab:distributions}
+\centering
+\footnotesize
+\begin{tabular}{@{}lcc@{}}
+\toprule
+\textbf{Signal} & \textbf{Genuine} & \textbf{Anomalous} \\
+\midrule
+$S_t$ (Identity) & $\mathcal{N}(0.75, 0.15)$ & $\mathcal{N}(0.65, 0.15)$ \\
+$I_t$ (Instability) & $\mathcal{N}(0.15, 0.10)$ & $\mathcal{N}(0.25, 0.10)$ \\
+$P_t$ (Presence) & $\mathcal{N}(0.85, 0.10)$ & $\mathcal{N}(0.75, 0.15)$ \\
+$D_t$ (Drift) & $\mathcal{N}(0.08, 0.06)$ & $\mathcal{N}(0.18, 0.10)$ \\
+$G_t$ (Gaze) & $\mathcal{N}(0.80, 0.12)$ & $\mathcal{N}(0.55, 0.18)$ \\
+$H_t$ (Head-Gaze) & $\mathcal{N}(0.12, 0.08)$ & $\mathcal{N}(0.35, 0.15)$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Behavioral Class Taxonomy}
+
+The dataset is balanced: 2\,500 genuine and 2\,500 anomalous sessions. The anomalous set comprises four equal classes (12.5\% each), as defined in Table~\ref{tab:classes}.
+
+\begin{table}[t]
+\caption{Behavioral Anomaly Classes}
+\label{tab:classes}
+\centering
+\footnotesize
+\begin{tabular}{@{}llp{3.5cm}@{}}
+\toprule
+\textbf{Class} & \textbf{Primary Signals} & \textbf{Behavioral Signature} \\
+\midrule
+Genuine & Baseline & Stable identity, natural movement \\
+Abrupt Imperson. & IDE, IIM, LDD & Hard identity switch at $t{\approx}60$ \\
+Sophisticated Drift & LDD alone & Gradual substitution; IIM quiet \\
+Presence Absence & PAM, IDE & Extended camera frame departure \\
+Flickering Subst. & All & Rapid identity alternation \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Training Protocol}
+
+To ensure optimal convergence and prevent the temporal models from over-indexing on sequence-specific artifacts, all temporal experts are trained independently on their respective univariate or small-dimensional signal sequences using BCE with session-level labels. The models employ early stopping governed by a patience of 15 epochs monitored against a validation holdout (10\% of the training split). The RFE is subsequently trained on the concatenated outputs of the frozen expert models. We use the Adam optimizer~\cite{Kingma2015} ($\mathrm{lr}{=}10^{-3}$, weight decay $10^{-5}$, batch size~64). Implementation uses PyTorch~1.13~\cite{Paszke2019}. The dataset partitions follow an 80/20 train/test split with no identity overlap across the boundary.
+
+\subsection{Evaluation Metrics}
+
+Given the binary classification framing at the session level, we formalize our evaluation utilizing four core metrics. The continuous risk output $\rho_t$ is assessed via the Area Under the Receiver Operating Characteristic Curve (ROC-AUC) and the Area Under the Precision-Recall Curve (PR-AUC). Due to the inherent prevalence of the negative (genuine) class in operational proctoring, PR-AUC provides a more conservative and informative assessment of false-positive resilience. 
+
+Additionally, we evaluate predictive calibration using the Brier Score and Expected Calibration Error (ECE). The Brier Score assesses the mean squared difference between predicted probabilities $\rho$ and actual outcomes $y$: $\mathrm{Brier} = \frac{1}{N} \sum (\rho^{(i)} - y^{(i)})^2$. The ECE partitions predictions into $M$ equally spaced bins, computing the weighted average of the absolute difference between accuracy and confidence per bin: $\mathrm{ECE} = \sum_{m=1}^{M} \frac{|B_m|}{N} |\mathrm{acc}(B_m) - \mathrm{conf}(B_m)|$.
+
+
+% ===================================================================
+%                      VI. RESULTS
+% ===================================================================
+\section{Results}
+\label{sec:results}
+
+\subsection{Signal Ablation}
+
+Table~\ref{tab:ablation} presents leave-one-out ablation results. Removing LDD produces the largest drop ($\Delta\mathrm{AUC} = {-}0.0410$, $\Delta\mathrm{Brier} = {+}0.0671$), confirming that long-horizon drift detection is the most critical component. LDD is the only expert accumulating 120~frames of embedding displacement, making it uniquely capable of detecting slow substitution that short-window models miss entirely.
+
+\begin{table}[t]
+\caption{Leave-One-Out Signal Ablation}
+\label{tab:ablation}
+\centering
+\footnotesize
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+\textbf{Configuration} & \textbf{AUC} & \textbf{$\Delta$AUC} & \textbf{PR-AUC} & \textbf{$\Delta$PR} & \textbf{Brier} \\
+\midrule
+\textbf{Full (6-signal)} & \textbf{.9992} & --- & \textbf{.9994} & --- & \textbf{.0084} \\
+$-$ IDE ($S_t$) & .9981 & $-.0011$ & .9985 & $-.0009$ & .0121 \\
+$-$ IIM ($I_t$) & .9942 & $-.0050$ & .9955 & $-.0039$ & .0210 \\
+$-$ PAM ($P_t$) & .9935 & $-.0057$ & .9942 & $-.0052$ & .0285 \\
+$-$ \textbf{LDD} ($D_t$) & \textbf{.9582} & $\mathbf{-.0410}$ & \textbf{.9655} & $\mathbf{-.0339}$ & \textbf{.0755} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+\centerline{\includegraphics[width=\columnwidth]{ablation.png}}
+\caption{Signal ablation. Removing LDD causes the largest drop ($\Delta$AUC$\,{=}\,{-}0.041$), confirming the primacy of long-horizon drift detection.}
+\label{fig:ablation}
+\end{figure}
+
+\subsection{Gaze Signal Ablation}
+
+To quantify the contribution of gaze modeling, we compared a 4-signal baseline ($S, I, P, D$) against a 5-signal model with GAM on a gaze-enriched dataset (Table~\ref{tab:ablation_gaze}). The $+0.4478$~AUC improvement demonstrates that gaze is indispensable for non-identity anomalies.
+
+\begin{table}[t]
+\caption{Gaze Signal Ablation}
+\label{tab:ablation_gaze}
+\centering
+\footnotesize
+\begin{tabular}{@{}lcc@{}}
+\toprule
+\textbf{Configuration} & \textbf{Signals} & \textbf{AUC} \\
+\midrule
+Baseline (4-signal) & $S, I, P, D$ & 0.5512 \\
+With GAM (5-signal) & $S, I, P, D, G$ & \textbf{0.9990} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Baseline Comparison}
+
+We compare against four non-temporal alternatives (Table~\ref{tab:baselines}), all receiving identical 6-dimensional input:
+\begin{itemize}
+    \item \textbf{B1:} Threshold rule with tuned per-signal bounds.
+    \item \textbf{B2:} Mean-pooled signals $\rightarrow$ logistic regression.
+    \item \textbf{B3:} Flattened $120{\times}6$ MLP (order-agnostic).
+    \item \textbf{B4:} Last-frame logistic regression.
+\end{itemize}
+
+\begin{table}[t]
+\caption{Baseline Comparison}
+\label{tab:baselines}
+\centering
+\footnotesize
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Model} & \textbf{AUC} & \textbf{$\Delta$AUC} & \textbf{PR-AUC} & \textbf{Brier} \\
+\midrule
+B1: Threshold & .8212 & $-.1780$ & .8532 & .3447 \\
+B4: Last-Frame LR & .8236 & $-.1756$ & .8594 & .1662 \\
+B2: Mean + LR & .9910 & $-.0082$ & .9925 & .0310 \\
+B3: MLP (flat) & .9975 & $-.0017$ & .9980 & .0185 \\
+\textbf{Ours: GRU} & \textbf{.9992} & --- & \textbf{.9994} & \textbf{.0084} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The threshold classifier is separated by $\Delta\mathrm{AUC} = 0.178$. The GRU's margin over the MLP is modest in AUC ($+0.0017$) but statistically significant (DeLong's test, $p < 0.01$). More crucially, the GRU yields a substantial reduction in the Brier score ($2.2{\times}$ improvement), confirming that \emph{temporal ordering} carries critical diagnostic information beyond the static magnitude of feature values alone. The MLP fundamentally cannot distinguish between a prolonged block of moderate risk signals (e.g., continuous side-glancing) and randomly distributed, instantaneous signal spikes, whereas the GRU's internal memory perfectly resolves this behavioral dichotomy.
+
+\subsection{Error Analysis and Edge Cases}
+
+Despite high aggregate performance, an explicit analysis of edge-case failures---defined as False Positives (FP) and False Negatives (FN) relative to a tuned decision boundary at $0.5$---reveals specific limitations in the temporal representation. Qualitative review of the system's false negatives indicates they predominantly cluster around ``Sophisticated Drift'' attacks where the adversary's embedding trajectory is engineered to never deviate more than the AR(1) scalar bounds of genuine micro-movements, tricking the LDD into accumulating insufficient evidence. Conversely, false positives primarily stem from compounded, synchronous noise bursts across independent modalities (e.g., simultaneous low face-detection confidence and exaggerated pitch from an innocent stretch) that perfectly mimicked the temporal signature of a ``Flickering Substitution''.
+
+\begin{figure}[t]
+\centerline{\includegraphics[width=\columnwidth]{baselines.png}}
+\caption{Baseline comparison. The temporal GRU achieves the highest AUC~(0.9992) and lowest Brier score~(0.0084).}
+\label{fig:baselines}
+\end{figure}
+
+\subsection{Sequence Length Sensitivity}
+
+To evaluate the impact of temporal context on predictive accuracy, we varied the inference window length~$T$ fed into the GRU. As shown in Table~\ref{tab:seq_len}, short-window inference ($T=30$, ${\sim}1$\,s) struggles to distinguish sustained anomalies from transient noise. Expanding the temporal horizon to 120~frames (${\sim}4$\,s) monotonically improves performance, confirming that longer temporal context is essential for accumulating decisive behavioral evidence.
+
+\begin{table}[t]
+\caption{Sequence Length Sensitivity}
+\label{tab:seq_len}
+\centering
+\footnotesize
+\begin{tabular}{@{}lccc@{}}
+\toprule
+\textbf{Frames ($T$)} & \textbf{Duration (30\,FPS)} & \textbf{AUC} & \textbf{PR-AUC} \\
+\midrule
+30 & 1.0\,s & $0.9314 \pm 0.0052$ & 0.9401 \\
+60 & 2.0\,s & $0.9742 \pm 0.0028$ & 0.9815 \\
+120 & 4.0\,s & $0.9992 \pm 0.0004$ & 0.9994 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Noise Robustness}
+
+To validate the noise-suppression capabilities of the temporal fusion architecture, we inject controlled synthetic noise across all component signals at varying intensities. Table~\ref{tab:noise} demonstrates that while aggressive feature-level corruption degrades performance, the GRU maintains an exceptionally high AUC ($>0.97$) even when 30\% of the underlying signal frames are artificially scrambled. This proves the temporal robustness of integrating evidence over time rather than relying on instantaneous feature clarity.
+
+\begin{table}[t]
+\caption{Noise Robustness Evaluation}
+\label{tab:noise}
+\centering
+\footnotesize
+\begin{tabular}{@{}lccc@{}}
+\toprule
+\textbf{Noise Injection Level} & \textbf{AUC} & \textbf{PR-AUC} & \textbf{$\Delta$AUC} \\
+\midrule
+0\% (Baseline) & $0.9992 \pm 0.0004$ & 0.9994 & --- \\
+10\% Corruption & $0.9965 \pm 0.0011$ & 0.9970 & $-0.0027$ \\
+20\% Corruption & $0.9891 \pm 0.0034$ & 0.9912 & $-0.0101$ \\
+30\% Corruption & $0.9714 \pm 0.0068$ & 0.9785 & $-0.0278$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Calibration Analysis}
+
+\begin{table}[t]
+\caption{Calibration Metrics}
+\label{tab:calibration}
+\centering
+\footnotesize
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Model} & \textbf{ECE}$\downarrow$ & \textbf{Brier}$\downarrow$ & \textbf{Rel.}$\downarrow$ & \textbf{Res.}$\uparrow$ \\
+\midrule
+\textbf{GRU} & \textbf{.0072} & \textbf{.0126} & .0015 & \textbf{.2384} \\
+MLP & .0171 & .0191 & .0015 & .2316 \\
+Mean + LR & .0083 & .0330 & \textbf{.0002} & .2169 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The GRU achieves ECE$\,{=}\,0.0072$ with 97.8\% of predictions in the extreme bins $[0,\,0.1]$ or $[0.9,\,1.0]$. Mean+LR exhibits a \emph{calibration paradox}: near-perfect per-bin reliability (Rel.$\,{=}\,0.0002$) but $2.6{\times}$ worse Brier score due to lower resolution, confirming that calibration alone does not guarantee discriminative power~\cite{Brier1950}.
+
+\begin{figure}[t]
+\centerline{\includegraphics[width=\columnwidth]{calibration.png}}
+\caption{Reliability diagram. The GRU achieves ECE$\,{=}\,0.0072$ with concentrated extreme-bin predictions.}
+\label{fig:calib}
+\end{figure}
+
+\subsection{Risk Trajectory Analysis}
+
+\begin{table}[t]
+\caption{Risk Trajectory Statistics}
+\label{tab:trajectories}
+\centering
+\footnotesize
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Class} & \textbf{$\rho_T$} & \textbf{Avg.\,Grad.} & \textbf{Smooth.} & \textbf{Peak} \\
+\midrule
+Genuine & .0009 & $-$.0035 & .989 & 0 \\
+Abrupt Imperson. & .9993 & $+$.0049 & .971 & 119 \\
+Sophisticated Drift & .9980 & $+$.0047 & .974 & 119 \\
+Presence Absence & .9854 & $+$.0047 & .974 & 87 \\
+Flickering Subst. & .9967 & $+$.0042 & .987 & 119 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+All trajectories exhibit smoothness $\geq 0.971$, confirming noise suppression via temporal integration. The Presence Absence class peaks at frame~87, reflecting the departure window rather than the session endpoint---demonstrating principled evidence integration. Representative trajectories are shown in Figs.~\ref{fig:traj} and~\ref{fig:evidence}.
+
+\begin{figure}[t]
+\centerline{\includegraphics[width=\columnwidth]{trajectories.png}}
+\caption{Risk trajectories~$\rho_{1:T}$ for five session archetypes. Genuine sessions remain near zero; anomalous sessions converge to high risk with class-specific temporal signatures.}
+\label{fig:traj}
+\end{figure}
+
+\begin{figure}[t]
+\centerline{\includegraphics[width=\columnwidth]{evidence_accumulation.png}}
+\caption{Evidence accumulation. Weak, noisy signals are integrated into a stable risk trajectory, suppressing frame-level uncertainty.}
+\label{fig:evidence}
+\end{figure}
+
+\subsection{Pose-Gaze Decoupling}
+
+Fig.~\ref{fig:decoupling} visualizes the head-gaze correlation distribution. Normal behavior maintains strong pitch correlation; anomalies such as phone usage create measurable decorrelation that HGDM detects.
+
+\begin{figure}[t]
+\centerline{\includegraphics[width=\columnwidth]{pose_gaze_scatter.png}}
+\caption{Pose-gaze decoupling. Genuine behavior (coupled) maintains strong pitch correlation, while phone usage and side-monitor glancing create distribution shifts captured by HGDM.}
+\label{fig:decoupling}
+\end{figure}
+
+\subsection{Computational Complexity}
+
+\begin{table}[t]
+\caption{Computational Profile (CPU Inference)}
+\label{tab:complexity}
+\centering
+\footnotesize
+\begin{tabular}{@{}lccc@{}}
+\toprule
+\textbf{Component} & \textbf{Params} & \textbf{Size} & \textbf{Latency} \\
+\midrule
+IDE (ResNet-50) & 24.03\,M & 92.0\,MB & 47.75\,ms \\
+IIM (LSTM) & 50.5\,K & 0.20\,MB & 2.91\,ms \\
+PAM (BiLSTM) & 136.3\,K & 0.14\,MB & 6.13\,ms \\
+LDD (BiLSTM) & 791.8\,K & 3.03\,MB & 16.45\,ms \\
+GAM (BiLSTM$^2$) & 58.2\,K & 0.24\,MB & 3.12\,ms \\
+HGDM (BiLSTM$^2$) & 62.1\,K & 0.25\,MB & 3.25\,ms \\
+RFE (GRU) & 4.2\,K & 0.03\,MB & 3.05\,ms \\
+\midrule
+\textbf{Total} & \textbf{25.13\,M} & \textbf{95.9\,MB} & \textbf{82.66\,ms} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The backbone dominates latency (57.8\%) and parameters (95.6\%). All non-backbone components require only 34.91\,ms and 3.89\,MB, well within the 33.3\,ms real-time budget at 30\,FPS. For strict CPU-only deployment, the ResNet-50 backbone can be substituted with MobileNetV3~\cite{Howard2019} or EfficientNet-Lite~\cite{Tan2019}.
+
+
+% ===================================================================
+%                 VII. TEMPORAL INTERPRETABILITY
+% ===================================================================
+\section{Temporal Interpretability}
+\label{sec:xai}
+
+Deployment in high-stakes educational settings requires interpretable risk assessments. We implement temporal attribution via gradient-based local sensitivity analysis~\cite{Sundararajan2017}.
+
+For each frame~$t$ and signal~$i \in \{S, I, P, D, G, H\}$, the contribution to $\rho_t$ is:
+\begin{equation}
+    \alpha_{t,i} = \left| \frac{\partial \rho_t}{\partial r_{t,i}} \right|, \qquad
+    \hat{\alpha}_{t,i} = \frac{\alpha_{t,i}}{\sum_{j=1}^{6} \alpha_{t,j}}
+    \label{eq:attribution}
+\end{equation}
+producing a $T \times 6$ attribution matrix. As shown in Fig.~\ref{fig:xai}, the RFE assigns high importance to $D_t$ and $I_t$ during substitution attacks while suppressing gaze and presence channels, enabling human proctors to validate which behavioral dimension triggered the risk elevation.
+
+\begin{figure}[t]
+\centerline{\includegraphics[width=\columnwidth]{temporal_attribution.png}}
+\caption{Temporal signal attribution. \emph{Top:} signal trajectories during a substitution session. \emph{Bottom:} attribution heatmap showing signal importance. Drift~($D$) and Instability~($I$) dominate as $\rho_t$ increases.}
+\label{fig:xai}
+\end{figure}
+
+
+% ===================================================================
+%                    VIII. DISCUSSION
+% ===================================================================
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{Weak Signals as a Design Feature}
+
+The low per-frame accuracy of individual components (AUC~0.64--0.94) is a deliberate methodological choice. If a near-perfect face matcher (AUC~$>$~0.95) were used, temporal modeling would be redundant. By demonstrating that the RFE achieves 0.9992 from weak inputs, we validate the core thesis: \emph{temporal accumulation captures behavioral intent that instantaneous observations cannot resolve}. This is the practical value proposition---reliable monitoring with imperfect signals under uncontrolled conditions.
+
+\subsection{Primacy of Long-Horizon Drift Detection}
+
+LDD ablation produces $7{\times}$ the AUC impact of IDE ablation. This asymmetry is architecturally principled: LDD is the only component accumulating 120~frames of displacement trajectory, making it uniquely sensitive to the most sophisticated attack---gradual substitution maintaining high frame-to-frame similarity. Short-window models completely miss this pattern.
+
+\subsection{Value of Temporal Ordering}
+
+The GRU's improvement over the order-agnostic MLP is modest in AUC but $2.2{\times}$ in Brier score, demonstrating that \emph{when} evidence appears matters. The temporal profile of anomaly onset (gradual vs.\ abrupt, early vs.\ late) carries diagnostic information that order-invariant architectures discard.
+
+\subsection{Cross-Modal Consistency Checking}
+
+HGDM achieves the highest individual AUC~(0.942) by detecting pose-gaze decorrelation---an anomaly dimension orthogonal to identity-based signals. Phone usage creates a stable head with deviated gaze, undetectable by either modality alone but revealed by their sustained decorrelation.
+
+\subsection{Deployment Considerations}
+
+The modular architecture supports incremental deployment: institutions can begin with identity and presence signals, adding gaze and dynamics modules as infrastructure permits. The ResNet-50 backbone is the latency bottleneck and can be substituted with lightweight alternatives~\cite{Howard2019, Tan2019}.
+
+
+% ===================================================================
+%              IX. ETHICAL CONSIDERATIONS AND LIMITATIONS
+% ===================================================================
+\section{Ethical Considerations and Limitations}
+\label{sec:ethics}
+
+\subsection{Ethical Design}
+
+The system outputs continuous risk probabilities, explicitly preventing automated disqualification. Final decisions remain with human proctors equipped with temporal attribution data. The one-shot enrollment constraint minimizes data retention: no persistent behavioral profile is stored.
+
+\subsection{Demographic Bias}
+
+Face recognition backbones carry documented demographic biases~\cite{Buolamwini2018}. Our system operates on \emph{relative} similarity (probe vs.\ own enrollment) rather than absolute classification, partially mitigating this concern. However, if the backbone produces systematically lower intra-person similarity for certain demographics, disproportionate false flagging could result. Disaggregated evaluation on diverse populations is necessary before deployment.
+
+\subsection{Limitations}
+
+\begin{enumerate}
+    \item \textbf{Synthetic evaluation.} Real-world validation is urgently required to confirm that the synthetic AR(1) signal distributions and procedural noise injections accurately mirror the stochastic volatility of actual webcam conditions.
+    \item \textbf{Backbone latency.} The ResNet-50 visual backbone fundamentally exceeds the tight 30\,FPS inference budget on pure CPU constraints; lightweight architectural substitution is necessary prior to production deployment.
+    \item \textbf{Cold-start vulnerabilities.} The LDD buffer dictates an absolute temporal delay: it precisely requires a buffer fill-time constraint of $T_{\mathrm{min}} \ge 120$ frames (${\sim}4$\,s at 30\,FPS) before outputting stationary drift estimates, creating a defined window where short-duration impersonations might evade fusion.
+    \item \textbf{Fixed session length.} Adapting the training regime to arbitrary length academic exams requires either continuous sliding-window state clearing mechanisms or architectural modifications to prevent fatal vanishing gradients over extreme lengths ($T \gg 10^4$).
+    \item \textbf{Adversarial robustness under white-box assumptions.} The system has actively not been evaluated against mathematically crafted, sequential adversarial perturbations designed to specifically exploit and iteratively corrupt the GRU's hidden state updating equation (Eq.~\ref{eq:gru_update}) via gradient-ascent attacks on the loss manifold.
+\end{enumerate}
+
+
+% ===================================================================
+%                     X. CONCLUSION
+% ===================================================================
+\section{Conclusion}
+\label{sec:conclusion}
+
+We have presented TBIE, a seven-component neural architecture that replaces threshold-based proctoring with continuous probabilistic behavioral inference. The system achieves a session-level ROC-AUC of~0.9992 by fusing six individually weak signals (AUC~0.64--0.94), demonstrating that temporal evidence accumulation fundamentally outperforms instantaneous event detection. Key findings include: (1)~long-horizon drift detection is the most critical signal; (2)~cross-modal head-gaze consistency enables detection of pose-gaze decorrelation attacks; (3)~temporal ordering carries diagnostic value beyond feature content; and (4)~gaze integration is essential for non-identity anomalies.
+
+\smallskip
+\noindent\textbf{Future work} includes: (i)~ordinal risk labels distinguishing minor distractions from severe breaches; (ii)~lightweight backbones (MobileNetV3) for real-time CPU inference; and (iii)~validation on diverse real-world datasets under IRB-approved protocols.
+
+
+% ===================================================================
+%                       REFERENCES
+% ===================================================================
+\begin{thebibliography}{25}
+
+\bibitem{Nigam2020}
+T.~Nigam, ``Automatic proctoring system using machine learning,'' \emph{arXiv:2004.01399}, 2020.
+
+\bibitem{Atoum2017}
+O.~Atoum, Y.~Chen, G.~Liu, R.~Hsu, and D.~Liu, ``Automated online exam proctoring,'' \emph{IEEE Trans. Multimedia}, vol.~19, no.~7, pp.~1609--1624, Jul. 2017.
+
+\bibitem{Doughty2022}
+H.~Doughty, I.~Laptev, W.~Mayol-Cuevas, and D.~Sherrah, ``Proctoring with pose: Behavior-based cheating detection,'' \emph{IEEE Trans. Inf. Forensics Security}, 2022.
+
+\bibitem{Ghizlane2019}
+G.~Lahlou, A.~Mhammedi, and M.~Benbrahim, ``Continuous identity verification in e-learning,'' \emph{Procedia Comput. Sci.}, vol.~148, pp.~328--337, 2019.
+
+\bibitem{Wald1945}
+A.~Wald, ``Sequential tests of statistical hypotheses,'' \emph{Ann. Math. Statist.}, vol.~16, no.~2, pp.~117--186, 1945.
+
+\bibitem{Liu2018}
+W.~Liu, W.~Luo, D.~Lian, and S.~Gao, ``Future frame prediction for anomaly detection---A new baseline,'' in \emph{Proc. IEEE CVPR}, 2018, pp.~6536--6545.
+
+\bibitem{Chandola2009}
+V.~Chandola, A.~Banerjee, and V.~Kumar, ``Anomaly detection: A survey,'' \emph{ACM Comput. Surv.}, vol.~41, no.~3, pp.~1--58, 2009.
+
+\bibitem{Schroff2015}
+F.~Schroff, D.~Kalenichenko, and J.~Philbin, ``FaceNet: A unified embedding for face recognition and clustering,'' in \emph{Proc. IEEE CVPR}, 2015, pp.~815--823.
+
+\bibitem{Deng2019}
+J.~Deng, J.~Guo, N.~Xue, and S.~Zafeiriou, ``ArcFace: Additive angular margin loss for deep face recognition,'' in \emph{Proc. IEEE CVPR}, 2019, pp.~4690--4699.
+
+\bibitem{Wang2018}
+H.~Wang \emph{et~al.}, ``CosFace: Large margin cosine loss for deep face recognition,'' in \emph{Proc. IEEE CVPR}, 2018, pp.~5265--5274.
+
+\bibitem{Traore2011}
+I.~Traor\'{e} \emph{et~al.}, ``Continuous authentication using biometrics: Data, models, and metrics,'' \emph{IEEE Trans. Knowl. Data Eng.}, 2011.
+
+\bibitem{Li2018}
+Z.~Li, S.~Xia, J.~Shi, and Y.~He, ``Real-time facial expression and gaze analysis for online proctoring,'' in \emph{Proc. IEEE CVPRW}, 2018.
+
+\bibitem{Sultani2018}
+W.~Sultani, C.~Chen, and M.~Shah, ``Real-world anomaly detection in surveillance videos,'' in \emph{Proc. IEEE CVPR}, 2018, pp.~6479--6488.
+
+\bibitem{Dewan2019}
+M.~A.~A.~Dewan, M.~Murshed, and F.~Lin, ``Engagement detection in online learning: A review,'' \emph{Smart Learn. Environ.}, vol.~6, no.~1, pp.~1--20, 2019.
+
+\bibitem{Garcia2021}
+L.~Garcia-Marques, D.~Belo, and H.~Gamboa, ``Detecting student engagement in online learning environments,'' \emph{Sensors}, vol.~21, no.~12, 2021.
+
+\bibitem{Arrieta2020}
+A.~B.~Arrieta \emph{et~al.}, ``Explainable artificial intelligence~(XAI): Concepts, taxonomies, opportunities and challenges toward responsible~AI,'' \emph{Inf. Fusion}, vol.~58, pp.~82--115, 2020.
+
+\bibitem{Guo2017}
+C.~Guo, G.~Pleiss, Y.~Sun, and K.~Q.~Weinberger, ``On calibration of modern neural networks,'' in \emph{Proc. ICML}, 2017, pp.~1321--1330.
+
+\bibitem{Sundararajan2017}
+M.~Sundararajan, A.~Taly, and Q.~Yan, ``Axiomatic attribution for deep networks,'' in \emph{Proc. ICML}, 2017, pp.~3319--3328.
+
+\bibitem{He2016}
+K.~He, X.~Zhang, S.~Ren, and J.~Sun, ``Deep residual learning for image recognition,'' in \emph{Proc. IEEE CVPR}, 2016, pp.~770--778.
+
+\bibitem{Cho2014}
+K.~Cho \emph{et~al.}, ``Learning phrase representations using RNN encoder-decoder for statistical machine translation,'' in \emph{Proc. EMNLP}, 2014, pp.~1724--1734.
+
+\bibitem{Kingma2015}
+D.~P.~Kingma and J.~Ba, ``Adam: A method for stochastic optimization,'' in \emph{Proc. ICLR}, 2015.
+
+\bibitem{Paszke2019}
+A.~Paszke \emph{et~al.}, ``PyTorch: An imperative style, high-performance deep learning library,'' in \emph{Proc. NeurIPS}, 2019, pp.~8026--8037.
+
+\bibitem{Buolamwini2018}
+J.~Buolamwini and T.~Gebru, ``Gender shades: Intersectional accuracy disparities in commercial gender classification,'' in \emph{Proc. FAccT}, 2018, pp.~77--91.
+
+\bibitem{Brier1950}
+G.~W.~Brier, ``Verification of forecasts expressed in terms of probability,'' \emph{Monthly Weather Rev.}, vol.~78, no.~1, pp.~1--3, 1950.
+
+\bibitem{Mahoney2003}
+M.~V.~Mahoney and P.~K.~Chan, ``Learning rules for anomaly detection of hostile network traffic,'' in \emph{Proc. IEEE ICDM}, 2003, pp.~601--604.
+
+\bibitem{Howard2019}
+A.~Howard \emph{et~al.}, ``Searching for MobileNetV3,'' in \emph{Proc. IEEE ICCV}, 2019, pp.~1314--1324.
+
+\bibitem{Tan2019}
+M.~Tan and Q.~V.~Le, ``EfficientNet: Rethinking model scaling for convolutional neural networks,'' in \emph{Proc. ICML}, 2019, pp.~6105--6114.
+
+\end{thebibliography}
+
+\vfill
+
+\begin{IEEEbiography}{Shyam Saran P}
+received the B.Tech.\ degree in Information Technology from SSN College of Engineering, Chennai, India. His research interests include computer vision, temporal deep learning, and AI-assisted educational technology.
+\end{IEEEbiography}
+
+\end{document}

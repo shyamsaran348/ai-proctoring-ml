@@ -11,14 +11,20 @@ models:
     hidden_dim: 64
     num_layers: 2
   uc5:
-    path: "proctoring_ml_module/models/uc5_risk_gru.pth"
-    input_dim: 2
+    path: "proctoring_ml_module/models/uc5_risk_gru_v3.pth"
+    input_dim: 6
     hidden_dim: 32
-    max_history: 300  # How many previous frames to keep for fusion context (5-10 sec @ 30fps is too short, maybe 300 frames?)
-                      # Actually, if UC2 is 60 frames (2 sec @ 30fps?), UC5 should probably see more.
-                      # Let's set a reasonable buffer. If it grows too large, inference slows down.
-                      # For "continuous risk", maybe we just keep the whole session or a long window.
-                      # Let's default to a sliding window of 300 for now.
+    max_history: 300
+  gam:
+    path: "proctoring_ml_module/models/gam_model.pth"
+    input_dim: 6
+    hidden_dim: 64
+    num_layers: 2
+  hgdm:
+    path: "proctoring_ml_module/models/hgdm_model.pth"
+    input_dim: 7
+    hidden_dim: 64
+    num_layers: 2
 
 inference:
   device: "cpu" # Default to CPU for broad compatibility, change to "cuda" or "mps" if needed.

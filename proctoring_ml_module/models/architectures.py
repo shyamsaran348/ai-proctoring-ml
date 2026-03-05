@@ -47,18 +47,67 @@ class TemporalLSTM(nn.Module):
 
 
 # ---------------------------------------------------------
-# UC5: Risk Fusion GRU (3-Signal Version)
+# GAM: Gaze Attentiveness Model (Phase 17)
+# ---------------------------------------------------------
+class GAM(nn.Module):
+    def __init__(self, input_dim=6, hidden_dim=64, num_layers=2, dropout=0.3):
+        super().__init__()
+        self.lstm = nn.LSTM(
+            input_size=input_dim,
+            hidden_size=hidden_dim,
+            num_layers=num_layers,
+            batch_first=True,
+            dropout=dropout if num_layers > 1 else 0,
+            bidirectional=True
+        )
+        self.fc = nn.Linear(hidden_dim * 2, 1)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        h_seq, _ = self.lstm(x)
+        out = self.fc(h_seq)
+        return self.sigmoid(out)
+
+
+# ---------------------------------------------------------
+# HGDM: Head-Gaze Dynamics Model (Phase 18)
+# ---------------------------------------------------------
+class HGDM(nn.Module):
+    def __init__(self, input_dim=7, hidden_dim=64, num_layers=2, dropout=0.3):
+        super().__init__()
+        self.lstm = nn.LSTM(
+            input_size=input_dim,
+            hidden_size=hidden_dim,
+            num_layers=num_layers,
+            batch_first=True,
+            dropout=dropout if num_layers > 1 else 0,
+            bidirectional=True
+        )
+        self.fc = nn.Linear(hidden_dim * 2, 1)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        h_seq, _ = self.lstm(x)
+        out = self.fc(h_seq)
+        return self.sigmoid(out)
+
+
+# ---------------------------------------------------------
+# UC5: Risk Fusion GRU (6-Signal Version - Phase 18)
 # ---------------------------------------------------------
 class RiskFusionGRU(nn.Module):
     """
-    GRU-based risk fusion model for UC5.
+    GRU-based risk fusion model (Phase 18).
 
     Input:
-        x: Tensor of shape (B, T, 3)
+        x: Tensor of shape (B, T, 6)
            features = [
                UC1_similarity,
                UC2_instability_prob,
-               UC3_presence_prob
+               UC3_presence_prob,
+               UC4_drift_prob,
+               GAM_gaze_prob,
+               HGDM_head_gaze_prob
            ]
 
     Output:
@@ -66,7 +115,7 @@ class RiskFusionGRU(nn.Module):
         final_risk: (B,)
     """
 
-    def __init__(self, input_dim=4, hidden_dim=32):
+    def __init__(self, input_dim=6, hidden_dim=32):
         super().__init__()
 
         self.hidden_dim = hidden_dim

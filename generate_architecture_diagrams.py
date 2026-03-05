@@ -3,9 +3,9 @@ generate_architecture_diagrams.py (v3 — Classic IEEE Academic Style)
 ======================================================================
 Generates two high-quality, classic IEEE-style research diagrams:
 
-  fig6_system_architecture.png — Layered architecture with dashed
+  system_architecture.png — Layered architecture with dashed
                                  grouping boxes and distinct shapes.
-  fig7_workflow.png            — Formal flowchart with decision diamonds,
+  workflow.png            — Formal flowchart with decision diamonds,
                                  data cylinders, and orthogonal flow.
 
 Style: Serif fonts, orthogonal routing, distinct semantic shapes.
@@ -152,95 +152,109 @@ def orth_arrow(ax, p1, p2, lw=1.2, label='', lpos='right', text_offset=(0,0)):
 # ════════════════════════════════════════════════════════════════════════════
 # FIG 6: ARCHITECTURE (Layered Grouping Style)
 # ════════════════════════════════════════════════════════════════════════════
-def fig6_architecture():
-    fig, ax = plt.subplots(figsize=(10, 8))
-    ax.set_xlim(0, 10)
-    ax.set_ylim(0, 10)
+def architecture():
+    fig, ax = plt.subplots(figsize=(11, 13))
+    ax.set_xlim(-0.5, 11.5)
+    ax.set_ylim(-0.5, 13.5)
     ax.axis('off')
     
-    # ── Layer 1: Data Acquisition & Preprocessing ──
-    draw_group_box(ax, 5, 8.0, 9.5, 3.2, "Feature Extraction & Identity Constraints")
+    # ── Layer 1: Feature Extraction & Identity Constraints ──
+    draw_group_box(ax, 5.5, 11.0, 10.5, 4.2, "Feature Extraction & Identity Constraints")
     
-    # Enrollment
-    draw_parallelogram(ax, 2.5, 9.0, 2.5, 0.6, "Enrollment Image\n$f_{enroll}$")
-    draw_rounded_rect(ax, 2.5, 7.8, 2.5, 0.7, "ResNet-50\n(Shared Weights)", bold=True)
-    draw_cylinder(ax, 2.5, 6.7, 3.0, 0.7, "Immutable Embedding $e_0$\n(Fixed Reference)")
-    orth_arrow(ax, (2.5, 8.7), (2.5, 8.15))
-    orth_arrow(ax, (2.5, 7.45), (2.5, 7.05))
+    # Enrollment path
+    draw_parallelogram(ax, 2.5, 12.5, 2.5, 0.6, "Enrollment Image\n$I_{ref}$")
+    draw_rounded_rect(ax, 2.5, 11.3, 2.5, 0.7, "ResNet-50\n(Shared Weights)", bold=True)
+    draw_cylinder(ax, 2.5, 10.1, 3.0, 0.7, "Immutable Embedding $e_0$\n(Fixed Reference)")
+    orth_arrow(ax, (2.5, 12.2), (2.5, 11.65))
+    orth_arrow(ax, (2.5, 10.95), (2.5, 10.45))
     
-    # Live
-    draw_parallelogram(ax, 7.5, 9.0, 2.5, 0.6, "Live Frame\n$f_t$")
-    draw_rounded_rect(ax, 7.5, 7.8, 2.5, 0.7, "ResNet-50\n(Shared Weights)", bold=True)
-    draw_rect(ax, 7.5, 6.7, 2.5, 0.6, "Probe Embedding\n$e_t$")
-    orth_arrow(ax, (7.5, 8.7), (7.5, 8.15))
-    orth_arrow(ax, (7.5, 7.45), (7.5, 7.0))
+    # Live path
+    draw_parallelogram(ax, 8.5, 12.5, 2.5, 0.6, "Live Frame\n$I_t$")
+    draw_rounded_rect(ax, 8.5, 11.3, 2.5, 0.7, "ResNet-50\n(Shared Weights)", bold=True)
+    draw_rect(ax, 8.5, 10.1, 2.5, 0.6, "Probe Embedding\n$e_t$")
+    orth_arrow(ax, (8.5, 12.2), (8.5, 11.65))
+    orth_arrow(ax, (8.5, 10.95), (8.5, 10.4))
     
-    # Comparisons
-    draw_rect(ax, 5.0, 6.7, 1.8, 0.6, "Sim $S_t = e_t \\cdot e_0$\nDelta $\\delta_t = e_t - e_0$")
-    # Horizontal arrows
-    orth_arrow(ax, (4.0, 6.7), (4.1, 6.7)) # From e0
-    orth_arrow(ax, (6.25, 6.7), (5.9, 6.7)) # From et
+    # Comparison block
+    draw_rect(ax, 5.5, 10.1, 2.4, 0.6, "Sim $S_t = e_t \\cdot e_0$\nDelta $\\delta_t = e_t - e_0$")
+    orth_arrow(ax, (4.0, 10.1), (4.3, 10.1))
+    orth_arrow(ax, (7.25, 10.1), (6.7, 10.1))
     
-    # ── Layer 2: Temporal Modeling ──
-    draw_group_box(ax, 5, 4.3, 9.5, 2.4, "Temporal Modeling Layer")
+    # ── Layer 2: Temporal Modeling (5 experts) ──
+    draw_group_box(ax, 5.5, 6.8, 10.5, 2.8, "Temporal Modeling Layer")
     
-    draw_rounded_rect(ax, 2.0, 4.3, 2.4, 1.2, "IIM: Instability\n(LSTM, window $W$)")
-    draw_rounded_rect(ax, 5.0, 4.3, 2.4, 1.2, "LDD: Drift\n(Bi-LSTM, 120-buf)")
-    draw_rounded_rect(ax, 8.0, 4.3, 2.4, 1.2, "PAM: Presence\n(Bi-LSTM, window $W$)")
+    # 5 expert boxes evenly spaced
+    experts_x = [1.2, 3.3, 5.5, 7.7, 9.8]
+    experts = [
+        "IIM: Instability\n(LSTM, $h$=32)",
+        "LDD: Drift\n(BiLSTM, $h$=128)",
+        "PAM: Presence\n(BiLSTM, $h$=64)",
+        "GAM: Gaze\n(BiLSTM$^2$, $h$=64)",
+        "HGDM: Head-Gaze\n(BiLSTM$^2$, $h$=64)",
+    ]
+    outputs = ["$I_t$", "$D_t$", "$P_t$", "$G_t$", "$H_t$"]
     
-    # Routing into Layer 2
-    # S_t -> IIM
-    pth = [(5.0, 6.4), (5.0, 5.8), (2.0, 5.8), (2.0, 4.9)]
-    x, y = zip(*pth)
-    ax.plot(x, y, color='black', lw=1.2, zorder=2)
-    ax.annotate('', xy=(2.0, 4.9), xytext=(2.0, 5.0), arrowprops=dict(arrowstyle='->', color='black', mutation_scale=10))
-    ax.text(2.6, 5.8, "Similarity seq $S_t$", ha='center', va='center', fontsize=8, bbox=dict(facecolor='white', edgecolor='none', pad=0))
-
-    # delta -> LDD
-    pth = [(5.0, 6.4), (5.0, 4.9)]
-    x, y = zip(*pth)
-    ax.plot(x, y, color='black', lw=1.2, zorder=2)
-    ax.annotate('', xy=(5.0, 4.9), xytext=(5.0, 5.0), arrowprops=dict(arrowstyle='->', color='black', mutation_scale=10))
-    ax.text(5.5, 5.8, "Delta seq $\\delta_t$", ha='center', va='center', fontsize=8, bbox=dict(facecolor='white', edgecolor='none', pad=0))
-
-    # Live frame -> 6D Features -> PAM
-    draw_rect(ax, 8.0, 5.7, 2.0, 0.4, "6D Extractor", ls='--', fc='#f8f8f8')
-    orth_arrow(ax, (8.5, 8.7), (8.5, 5.9)) # tap from frame
-    orth_arrow(ax, (8.0, 5.5), (8.0, 4.9), label="6D seq", text_offset=(0.6, 0))
-
+    for i, (ex, lbl) in enumerate(zip(experts_x, experts)):
+        draw_rounded_rect(ax, ex, 6.8, 1.9, 1.2, lbl)
+    
+    # Clean, non-overlapping routing
+    # IIM gets S_t from comparison block (routed left)
+    ax.plot([4.3, 3.0, 3.0, 1.2, 1.2], [10.1, 10.1, 8.8, 8.8, 7.4], color='black', lw=1.2, zorder=2)
+    ax.annotate('', xy=(1.2, 7.4), xytext=(1.2, 7.41), arrowprops=dict(arrowstyle='->', color='black', lw=1.2, mutation_scale=10), zorder=2)
+    
+    # LDD gets delta + S from comparison block (straight down)
+    ax.plot([5.5, 5.5, 3.3, 3.3], [9.8, 8.6, 8.6, 7.4], color='black', lw=1.2, zorder=2)
+    ax.annotate('', xy=(3.3, 7.4), xytext=(3.3, 7.41), arrowprops=dict(arrowstyle='->', color='black', lw=1.2, mutation_scale=10), zorder=2)
+    
+    # PAM gets presence features from Live path (routed straight down)
+    ax.plot([8.5, 8.5, 5.5, 5.5], [9.8, 9.2, 9.2, 7.4], color='black', lw=1.2, zorder=2)
+    ax.annotate('', xy=(5.5, 7.4), xytext=(5.5, 7.41), arrowprops=dict(arrowstyle='->', color='black', lw=1.2, mutation_scale=10), zorder=2)
+    
+    # GAM gets gaze features from Live path (routed right)
+    ax.plot([8.7, 8.7, 7.7, 7.7], [9.8, 8.7, 8.7, 7.4], color='black', lw=1.2, zorder=2)
+    ax.annotate('', xy=(7.7, 7.4), xytext=(7.7, 7.41), arrowprops=dict(arrowstyle='->', color='black', lw=1.2, mutation_scale=10), zorder=2)
+    
+    # HGDM gets head-gaze features from Live path (routed far right)
+    ax.plot([9.2, 9.2, 9.8, 9.8], [9.8, 8.9, 8.9, 7.4], color='black', lw=1.2, zorder=2)
+    ax.annotate('', xy=(9.8, 7.4), xytext=(9.8, 7.41), arrowprops=dict(arrowstyle='->', color='black', lw=1.2, mutation_scale=10), zorder=2)
+    
+    # Signal output labels beneath each expert
+    for i, (ex, out) in enumerate(zip(experts_x, outputs)):
+        ax.text(ex, 6.0, out, ha='center', va='center', fontsize=9,
+                fontstyle='italic', zorder=5)
+    
     # ── Layer 3: Risk Fusion ──
-    draw_group_box(ax, 5, 1.6, 9.5, 2.0, "Session Risk Fusion (Probabilistic)")
+    draw_group_box(ax, 5.5, 3.5, 10.5, 2.4, "Risk Fusion Layer")
     
-    draw_rounded_rect(ax, 5.0, 1.6, 3.5, 1.0, "RFE: GRU Fusion Engine\n(Session-level BCE Supervision)", bold=True)
+    draw_rounded_rect(ax, 5.5, 3.5, 4.0, 1.2,
+                      "RFE: Risk Fusion Engine\n(GRU, session-level)", bold=True)
     
-    # Routing into Layer 3
-    orth_arrow(ax, (2.0, 3.7), (4.0, 2.1))
-    ax.text(2.5, 2.9, "Instability $I_t$", fontsize=8, style='italic', bbox=dict(facecolor='white', edgecolor='none', pad=1))
+    # Route all experts to a common horizontal bus at y=4.4
+    for ex in experts_x:
+        ax.plot([ex, ex], [5.8, 4.4], color='black', lw=1.2, zorder=2)
+    # Horizontal bus
+    ax.plot([experts_x[0], experts_x[-1]], [4.4, 4.4], color='black', lw=1.2, zorder=2)
+    # Single down arrow to RFE
+    orth_arrow(ax, (5.5, 4.4), (5.5, 4.1))
     
-    orth_arrow(ax, (5.0, 3.7), (5.0, 2.1))
-    ax.text(5.4, 2.9, "Drift $D_t$", fontsize=8, style='italic', bbox=dict(facecolor='white', edgecolor='none', pad=1))
-    
-    orth_arrow(ax, (8.0, 3.7), (6.0, 2.1))
-    ax.text(7.5, 2.9, "Presence $P_t$", fontsize=8, style='italic', bbox=dict(facecolor='white', edgecolor='none', pad=1))
-    
-    # S_t direct leak to RFE
-    pth = [(4.1, 6.7), (0.4, 6.7), (0.4, 1.6), (3.25, 1.6)]
-    x, y = zip(*pth)
-    ax.plot(x, y, color='black', lw=1.0, ls=':', zorder=2)
-    ax.annotate('', xy=(3.25, 1.6), xytext=(3.15, 1.6), arrowprops=dict(arrowstyle='->', color='black', mutation_scale=10))
-    
-    # Output
-    draw_parallelogram(ax, 5.0, 0.4, 3.0, 0.5, "Final Risk Trajectory $\\rho_T$")
-    orth_arrow(ax, (5.0, 1.1), (5.0, 0.65))
 
-    plt.savefig(os.path.join(OUT_DIR, 'fig6_system_architecture.png'))
+    # ── Output ──
+    draw_rect(ax, 5.5, 1.2, 3.5, 0.8,
+              "Risk Trajectory\n$\\rho_t = \\sigma(W_o h_t + b_o)$")
+    orth_arrow(ax, (5.5, 2.9), (5.5, 1.6))
+    
+    # Final output label
+    draw_oval(ax, 5.5, 0.0, 2.5, 0.6, "Session Verdict")
+    orth_arrow(ax, (5.5, 0.8), (5.5, 0.3))
+
+    plt.savefig(os.path.join(OUT_DIR, 'system_architecture.png'))
     plt.close()
 
 
 # ════════════════════════════════════════════════════════════════════════════
 # FIG 7: WORKFLOW (Formal Flowchart)
 # ════════════════════════════════════════════════════════════════════════════
-def fig7_workflow():
+def workflow():
     fig, ax = plt.subplots(figsize=(7.5, 10))
     ax.set_xlim(0, 10.5)
     ax.set_ylim(0, 14)
@@ -250,13 +264,13 @@ def fig7_workflow():
     
     # Draw Background Phase Zones
     ax.add_patch(mpatches.Rectangle((0.5, 11.2), 9.5, 2.5, fill=True, facecolor='#f4f4f4', edgecolor='none', zorder=0))
-    ax.text(0.7, 13.5, "Phase 1: Enrollment", fontsize=10, fontweight='bold', color='#555555', ha='left', va='top')
+    ax.text(0.7, 13.5, "Enrollment", fontsize=10, fontweight='bold', color='#555555', ha='left', va='top')
     
     ax.add_patch(mpatches.Rectangle((0.5, 3.2), 9.5, 7.8, fill=True, facecolor='#fdfdfd', edgecolor='none', zorder=0))
-    ax.text(0.7, 10.8, "Phase 2: Live Monitoring", fontsize=10, fontweight='bold', color='#555555', ha='left', va='top')
+    ax.text(0.7, 10.8, "Live Monitoring", fontsize=10, fontweight='bold', color='#555555', ha='left', va='top')
     
     ax.add_patch(mpatches.Rectangle((0.5, 0.5), 9.5, 2.5, fill=True, facecolor='#f4f4f4', edgecolor='none', zorder=0))
-    ax.text(0.7, 2.8, "Phase 3: Session End", fontsize=10, fontweight='bold', color='#555555', ha='left', va='top')
+    ax.text(0.7, 2.8, "Session End", fontsize=10, fontweight='bold', color='#555555', ha='left', va='top')
     
     # Nodes
     draw_oval(ax, cx, 13.0, 2.0, 0.6, "Session Start")
@@ -273,13 +287,13 @@ def fig7_workflow():
     draw_parallelogram(ax, cx, 8.6, 3.5, 0.6, "Capture Live Frame $f_t$")
     orth_arrow(ax, (cx, 9.3), (cx, 8.9))
     
-    draw_rect(ax, cx, 7.5, 4.5, 0.8, "Extract Probe $e_t$\nCompute $S_t = e_t \\cdot e_0$, $\\delta_t = e_t - e_0$")
+    draw_rect(ax, cx, 7.5, 4.5, 0.8, "Extract Probe $e_t$, $S_t = e_t \\cdot e_0$\nExtract 6D Metadata (Pose, Gaze)")
     orth_arrow(ax, (cx, 8.3), (cx, 7.9))
     
-    draw_rect(ax, cx, 6.4, 4.5, 0.8, "Update Temporal Windows\nIIM($S_t$), PAM(6D), LDD($\\delta_t$)")
+    draw_rect(ax, cx, 6.4, 5.0, 0.8, "Update Temporal Windows\nIIM($S_t$), LDD($\\delta_t$), PAM(Presence), GAM(Gaze)")
     orth_arrow(ax, (cx, 7.1), (cx, 6.8))
     
-    draw_rect(ax, cx, 5.3, 4.5, 0.8, "Update Risk State\nRFE GRU: $\\rho_t = f(S_t, I_t, P_t, D_t)$")
+    draw_rect(ax, cx, 5.3, 5.0, 0.8, "Update Risk State\nRFE GRU: $\\rho_t = f(S_t, I_t, P_t, D_t, G_t)$")
     orth_arrow(ax, (cx, 6.0), (cx, 5.7))
     
     draw_diamond(ax, cx, 4.1, 2.5, 1.0, "Is $t == T$ ?")
@@ -300,12 +314,12 @@ def fig7_workflow():
     draw_oval(ax, cx, 0.8, 2.0, 0.6, "Session End")
     orth_arrow(ax, (cx, 1.5), (cx, 1.1))
 
-    plt.savefig(os.path.join(OUT_DIR, 'fig7_workflow.png'))
+    plt.savefig(os.path.join(OUT_DIR, 'workflow.png'))
     plt.close()
 
 
 if __name__ == '__main__':
     print('Generating formal IEEE flowchart and architecture diagrams...')
-    fig6_architecture()
-    fig7_workflow()
+    architecture()
+    workflow()
     print(f'Output saved to {OUT_DIR}')

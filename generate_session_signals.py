@@ -89,6 +89,8 @@ def main():
     uc2_probs = []
     uc3_presence = []
     uc4_probs = []
+    uc5_gaze = []
+    uc6_hgdm = []
     
     print("[INFO] Starting frame processing...")
     
@@ -104,17 +106,19 @@ def main():
         # Extract UC3 Features
         uc3_features = extractor.extract_frame_features(frame)
         
-        # Process Frame
-        metrics = engine.process_frame(frame_rgb, uc3_features=uc3_features)
+        # Extract Gaze Features (Stub for Phase 17/18)
+        # In a real system, these would come from MediaPipe
+        gaze_features = np.zeros(6, dtype=np.float32)
         
-        # Since UC2 gives an instability probability, the actual signal might be expected to be saved
-        # Note: UC2 and UC3 may return None for early frames, in engine.process_frame they handle None internally:
-        # uc3_presence = 0.5 if None
+        # Process Frame
+        metrics = engine.process_frame(frame_rgb, uc3_features=uc3_features, gaze_features=gaze_features)
         
         uc1_scores.append(metrics['uc1_similarity'])
         uc2_probs.append(metrics['uc2_instability'])
         uc3_presence.append(metrics['uc3_presence'])
         uc4_probs.append(metrics['uc4_drift'])
+        uc5_gaze.append(metrics['gam_gaze'])
+        uc6_hgdm.append(metrics['hgdm_prob'])
         
         frame_count += 1
         if frame_count % 30 == 0:
@@ -128,32 +132,20 @@ def main():
     out_dir.mkdir(parents=True, exist_ok=True)
     
     np.save(out_dir / "uc1_scores.npy", np.array(uc1_scores, dtype=np.float32))
-    
-    # Note: the build_risk_sequences.py script assumes uc2_probs is (N,) where N corresponds to windows.
-    # But looking at engines/uc2_engine.py, it likely returns a continuous prob per frame.
-    # In build_risk_sequences, it says:
-    # uc2_probs = np.load(UC2_PATH)   # (N,)
-    # uc2_probs gets aligned with:
-    # for k, prob in enumerate(uc2_probs):
-    #     end = k * UC2_STRIDE
-    #     start = max(0, end - (UC2_WINDOW - 1))
-    # It assumes UC2 was sampled differently. Let's check if the raw numpy arrays already exist 
-    # and if we should just duplicate uc2 or modify how we save.
-    
-    # Actually, in a live system, uc2 gives a frame-by-frame probability (which is actually computed over a window)
-    # So if we want to run build_risk_sequences.py as-is alongside the original dataset shapes,
-    # we might just replace it, but we can't change the stride logic without breaking validation.
-    
-    # Let's save both as generated. We'll adjust build_script later if it complains.
     np.save(out_dir / "uc2_probs.npy", np.array(uc2_probs, dtype=np.float32))
     np.save(out_dir / "uc3_presence.npy", np.array(uc3_presence, dtype=np.float32))
     np.save(out_dir / "uc4_probs.npy", np.array(uc4_probs, dtype=np.float32))
+    np.save(out_dir / "gam_probs.npy", np.array(uc5_gaze, dtype=np.float32))
+    np.save(out_dir / "hgdm_probs.npy", np.array(uc6_hgdm, dtype=np.float32))
     
     print(f"[SUCCESS] Signals saved to {out_dir}")
     print(f"uc1_scores: {len(uc1_scores)}")
     print(f"uc2_probs:  {len(uc2_probs)}")
     print(f"uc3_presence:{len(uc3_presence)}")
     print(f"uc4_probs:   {len(uc4_probs)}")
+    print(f"gam_probs:   {len(uc5_gaze)}")
+    print(f"hgdm_probs:  {len(uc6_hgdm)}")
+
     
     # Cleanup
     if os.path.exists(enrollment_path):

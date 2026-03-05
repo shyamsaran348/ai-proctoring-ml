@@ -972,6 +972,22 @@
           </div>
           <span class="signal-val" id="val-uc4">—</span>
         </div>
+        <!-- UC5 Gaze -->
+        <div class="signal-row">
+          <span class="signal-label">UC5 Gaze</span>
+          <div class="signal-track">
+            <div class="signal-fill" id="bar-uc5" style="background:#06b6d4;"></div>
+          </div>
+          <span class="signal-val" id="val-uc5">—</span>
+        </div>
+        <!-- UC6 Head-Gaze -->
+        <div class="signal-row">
+          <span class="signal-label">UC6 Head-Gaze</span>
+          <div class="signal-track">
+            <div class="signal-fill" id="bar-uc6" style="background:#8b5cf6;"></div>
+          </div>
+          <span class="signal-val" id="val-uc6">—</span>
+        </div>
       </div>
 
       <!-- ── Risk Sparkline ──────────────────────────────── -->
@@ -1019,6 +1035,14 @@
           </li>
           <li>
             <strong>Risk Score:</strong> GRU-fused session risk ∈ [0,1]. Low &lt; 0.3, Medium 0.3–0.7, High &gt; 0.7.
+          </li>
+          <li style="margin-top:10px;">
+            <strong>UC5 Gaze (↑ good):</strong> Gaze Attentiveness Model — BiLSTM over eye gaze features. Low value
+            indicates looking away.
+          </li>
+          <li style="margin-top:10px;">
+            <strong>UC6 Head-Gaze (↑ good):</strong> Head-Gaze Dynamics Model — detects decoupling between head pose
+            and gaze direction (e.g. phone usage).
           </li>
         </ul>
       </div>
@@ -1443,6 +1467,12 @@
         setBar('bar-uc2', 'val-uc2', uc2);
         setBar('bar-uc3', 'val-uc3', uc3);
         setBar('bar-uc4', 'val-uc4', uc4);
+
+        // Phase 17/18 signals
+        const uc5 = data.gam_gaze ?? 0.5;
+        const uc6 = data.hgdm_prob ?? 0.5;
+        setBar('bar-uc5', 'val-uc5', uc5);
+        setBar('bar-uc6', 'val-uc6', uc6);
 
         // Color-code UC1 bar by value
         const uc1Fill = document.getElementById('bar-uc1');

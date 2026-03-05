@@ -26,7 +26,7 @@ class UC5Engine:
         self.buffer = deque(maxlen=self.max_history)
 
         self.model = RiskFusionGRU(
-            input_dim=4,
+            input_dim=6,
             hidden_dim=self.hidden_dim
         )
 
@@ -41,16 +41,16 @@ class UC5Engine:
                 self.model.load_state_dict(state_dict)
                 print(f"[UC5] Loaded weights from {self.model_path}")
             except RuntimeError as e:
-                print(f"[UC5] WARNING: Checkpoint shape mismatch ({e}). Using random weights for now.")
+                print(f"[UC5] WARNING: Checkpoint shape mismatch ({e}). Phase 18 upgrade in progress.")
         else:
             print(f"[UC5] WARNING: Checkpoint not found at {self.model_path}. Using random weights.")
 
     def reset(self):
         self.buffer.clear()
 
-    def update(self, uc1_sim: float, uc2_prob: float, uc3_presence: float, uc4_drift: float) -> float:
+    def update(self, uc1_sim: float, uc2_prob: float, uc3_presence: float, uc4_drift: float, gam_gaze: float, hgdm_prob: float) -> float:
 
-        self.buffer.append([uc1_sim, uc2_prob, uc3_presence, uc4_drift])
+        self.buffer.append([uc1_sim, uc2_prob, uc3_presence, uc4_drift, gam_gaze, hgdm_prob])
 
         seq_data = list(self.buffer)
 

@@ -11,6 +11,9 @@ from proctoring_ml_module.engines.uc2_engine import UC2Engine
 from proctoring_ml_module.engines.uc3_engine import UC3PresenceEngine
 from proctoring_ml_module.engines.uc4_engine import UC4Engine
 from proctoring_ml_module.engines.uc5_engine import UC5Engine
+from ml.engines.gam_engine import GAMEngine
+from ml.engines.hgdm_engine import HGDMEngine
+from proctoring_ml_module.models.architectures import GAM, HGDM
 
 
 class ProctoringEngine:
@@ -38,6 +41,31 @@ class ProctoringEngine:
         uc4_path = os.path.join(self.config.get('model_dir', 'proctoring_ml_module/models'), 'uc4_drift_model.pth')
         self.uc4 = UC4Engine(uc4_path)
         
+        # Phase 17: GAM Engine
+        gam_model = GAM()
+        gam_path = os.path.join(self.config.get('model_dir', 'proctoring_ml_module/models'), 'gam_model.pth')
+        if os.path.exists(gam_path):
+            gam_model.load_state_dict(torch.load(gam_path, map_location='cpu'))
+            print(f"[ProctoringEngine] GAM weights loaded from {gam_path}")
+        else:
+            print("[ProctoringEngine] WARNING: GAM weights not found. Using untrained base.")
+            
+        self.gam = GAMEngine(gam_model, device=self.config.get('inference', {}).get('device', 'cpu'))
+
+        # Phase 18: HGDM Engine
+        hgdm_model = HGDM()
+        hgdm_path = os.path.join(self.config.get('model_dir', 'proctoring_ml_module/models'), 'hgdm_model.pth')
+        if os.path.exists(hgdm_path):
+            hgdm_model.load_state_dict(torch.load(hgdm_path, map_location='cpu'))
+            print(f"[ProctoringEngine] HGDM weights loaded from {hgdm_path}")
+        else:
+            print("[ProctoringEngine] WARNING: HGDM weights not found. Using untrained base.")
+            
+        self.hgdm = HGDMEngine(device=self.config.get('inference', {}).get('device', 'cpu'))
+        # Overwrite with loaded model
+        self.hgdm.model = hgdm_model.to(self.hgdm.device)
+        self.hgdm.model.eval()
+
         self.uc5 = UC5Engine(self.config)
 
         self.enrollment_embedding = None
@@ -66,6 +94,8 @@ class ProctoringEngine:
         self.uc2.reset()
         self.uc3.reset()
         self.uc4.reset()
+        self.gam.reset()
+        self.hgdm.reset()
         self.uc5.reset()
 
         self.session_active = True
@@ -77,13 +107,14 @@ class ProctoringEngine:
     # -------------------- FRAME PROCESSING --------------------
     # ==========================================================
 
-    def process_frame(self, frame_input, uc3_features=None):
+    def process_frame(self, frame_input, uc3_features=None, gaze_features=None):
         """
         Process a live camera frame.
 
         Args:
             frame_input: Path, PIL Image, or Numpy array
             uc3_features: numpy array (6,) for UC3 temporal presence modeling
+            gaze_features: numpy array (6,) for Phase 17 GAM gaze modeling
 
         Returns:
             dict:
@@ -92,6 +123,7 @@ class ProctoringEngine:
                 "uc2_instability": float,
                 "uc3_presence": float or None,
                 "uc4_drift": float,
+                "gam_gaze": float,
                 "risk": float
             }
         """
@@ -112,6 +144,7 @@ class ProctoringEngine:
                 "uc2_instability": 1.0,
                 "uc3_presence": 0.0,
                 "uc4_drift": 1.0,
+                "gam_gaze": 0.5,
                 "risk": 1.0
             }
 
@@ -148,16 +181,36 @@ class ProctoringEngine:
         delta_vector = probe_vec - enroll_vec
 
         uc4_drift = self.uc4.update(delta_vector, uc1_sim)
+        
+        # ------------------------------------------------------
+        # GAM — Eye Gaze Modeling (Phase 17)
+        # ------------------------------------------------------
+        
+        g_t_prob = 0.5
+        if gaze_features is not None:
+            g_t_prob = self.gam.update(gaze_features)
 
         # ------------------------------------------------------
-        # UC5 — Risk Fusion (Now 4-Signal)
+        # HGDM — Head-Gaze Dynamics (Phase 18)
+        # ------------------------------------------------------
+        
+        h_t_prob = 0.5
+        if uc3_features is not None and gaze_features is not None:
+            # uc3_features index 2,3,4 are yaw, pitch, roll
+            head_pose = uc3_features[2:5]
+            h_t_prob = self.hgdm.update(head_pose, gaze_features)
+
+        # ------------------------------------------------------
+        # UC5 — Risk Fusion (Now 6-Signal)
         # ------------------------------------------------------
 
         risk = self.uc5.update(
             uc1_sim,
             uc2_prob,
             presence_prob,
-            uc4_drift
+            uc4_drift,
+            g_t_prob,
+            h_t_prob
         )
 
         print(
@@ -165,6 +218,8 @@ class ProctoringEngine:
             f"Instability: {uc2_prob:.4f} | "
             f"Presence: {presence_prob:.4f} | "
             f"Drift: {uc4_drift:.4f} | "
+            f"Gaze: {g_t_prob:.4f} | "
+            f"HGDM: {h_t_prob:.4f} | "
             f"Risk: {risk:.4f}"
         )
 
@@ -173,6 +228,9 @@ class ProctoringEngine:
             "uc2_instability": uc2_prob,
             "uc3_presence": presence_prob,
             "uc4_drift": uc4_drift,
+            "gam_gaze": g_t_prob,
+            "hgdm_prob": h_t_prob,
             "risk": risk
         }
+
     

@@ -240,6 +240,8 @@ class MLProctoringAdapter:
         self.latest_status['uc2_instability']  = instability
         self.latest_status['uc3_presence']     = metrics.get('uc3_presence', 0.5)
         self.latest_status['uc4_drift']        = metrics.get('uc4_drift', 0.0)
+        self.latest_status['gam_gaze']         = metrics.get('gam_gaze', 0.5)
+        self.latest_status['hgdm_prob']        = metrics.get('hgdm_prob', 0.5)
         self.latest_status['risk_score']       = risk_score
         self.latest_status['last_update']      = time.time()
         self.latest_status['is_active']        = True
@@ -271,6 +273,8 @@ class MLProctoringAdapter:
             'uc2':   instability,
             'uc3':   metrics.get('uc3_presence', 0.5),
             'uc4':   metrics.get('uc4_drift', 0.0),
+            'gam':   metrics.get('gam_gaze', 0.5),
+            'hgdm':  metrics.get('hgdm_prob', 0.5),
         })
 
     def get_live_status(self):
