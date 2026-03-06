@@ -68,7 +68,7 @@ Online proctoring, temporal behavioral inference, one-shot identity verification
 
 \emph{Rule-based heuristic systems} define hand-crafted thresholds for individual behavioral indicators (e.g., gaze angle, head pose deviation, face detection confidence). Such thresholds are calibrated in controlled laboratory settings and are therefore brittle under the heterogeneous lighting, camera angles, and background activity characteristic of home environments~\cite{Nigam2020, Atoum2017}. More critically, sophisticated cheating strategies that maintain each individual signal within acceptable bounds while exhibiting anomalous \emph{combinations} over time completely evade threshold-based detection.
 
-\emph{Static binary classifiers} collapse the evolving nature of exam integrity into a single decision point per frame or per fixed window. Although deep learning variants improve robustness over hand-crafted features~\cite{Doughty2022, Ghizlane2019}, they discard the temporal structure that distinguishes momentary legitimate behaviors from sustained anomalous patterns.
+\emph{Static binary classifiers} collapse the evolving nature of exam integrity into a single decision point per frame or per fixed window. Although deep learning variants improve robustness over hand-crafted features~\cite{Doughty2022, Ghizlane2019}, they discard the temporal structure that distinguishes momentary legitimate behaviors from sustained anomalous patterns. State-of-the-art (SOTA) systems in concurrent literature increasingly leverage Vision Transformers (ViTs) or 3D-CNNs for spatial-temporal encoding; however, these architectures are computationally prohibitive for real-time edge inference and often fail to decouple orthogonal behavioral modalities (e.g., identity drift vs.\ gaze aversion).
 
 The core insight motivating this work is that proctoring should be modeled as a \textbf{continuous temporal inference problem}. Individual behavioral signals are inherently noisy at the frame level: a single frame showing reduced identity similarity may reflect momentary lighting variation; a brief gaze aversion is common during keyboard interaction. However, when multiple weak signals exhibit coordinated anomalous patterns sustained over time, the evidence for integrity violation becomes compelling. This principle, well-established in sequential hypothesis testing~\cite{Wald1945} and temporal anomaly detection~\cite{Liu2018, Chandola2009}, has not been systematically applied to online proctoring.
 
@@ -116,6 +116,12 @@ Deployment of AI in educational assessment demands interpretability~\cite{Arriet
 \label{sec:formulation}
 
 Let $\mathcal{S} = \{I_1, I_2, \ldots, I_T\}$ denote a sequence of $T$ webcam frames captured during an exam session, and let $I_{\mathrm{ref}}$ denote a single enrollment image captured before the session begins. The system must produce a risk trajectory $\bm{\rho} = (\rho_1, \rho_2, \ldots, \rho_T)$ where each $\rho_t \in [0,1]$ represents the accumulated evidence for an integrity violation at time~$t$.
+
+Formally, we model the true integrity of the session as a latent state evolution within a Partially Observable framework. The instantaneous visual observations $I_t$ are noisy projections of the true behavioral state. The objective is to construct a recursive Bayesian filter that approximates the posterior probability of an ongoing integrity violation given all evidence up to time $t$:
+\begin{equation}
+    \rho_t \approx \mathbb{P}(\text{Violation at } t \mid I_{1:t}, I_{\mathrm{ref}})
+\end{equation}
+Because explicitly computing this high-dimensional posterior over raw high-resolution video is intractable, we factorize the observation space into six semantically disentangled sub-manifolds (identity, presence, gaze dynamics) and employ a recurrent neural architecture to parameterize the sequential updating function.
 
 \begin{table}[t]
 \caption{Summary of Notation}
@@ -369,9 +375,11 @@ Flickering Subst. & All & Rapid identity alternation \\
 \end{tabular}
 \end{table}
 
-\subsection{Training Protocol}
+\subsection{Training Protocol and Hardware Infrastructure}
 
-To ensure optimal convergence and prevent the temporal models from over-indexing on sequence-specific artifacts, all temporal experts are trained independently on their respective univariate or small-dimensional signal sequences using BCE with session-level labels. The models employ early stopping governed by a patience of 15 epochs monitored against a validation holdout (10\% of the training split). The RFE is subsequently trained on the concatenated outputs of the frozen expert models. We use the Adam optimizer~\cite{Kingma2015} ($\mathrm{lr}{=}10^{-3}$, weight decay $10^{-5}$, batch size~64). Implementation uses PyTorch~1.13~\cite{Paszke2019}. The dataset partitions follow an 80/20 train/test split with no identity overlap across the boundary.
+To ensure optimal convergence and prevent the temporal models from over-indexing on sequence-specific artifacts, all temporal experts are trained independently on their respective univariate or small-dimensional signal sequences using BCE with session-level labels. The embedding backbone (IDE) utilizes pre-trained ImageNet weights, subsequently fine-tuned using ArcFace margin loss prior to session-level feature extraction. 
+
+The temporal models employ early stopping governed by a patience of 15 epochs monitored against a validation holdout (10\% of the training split). The RFE is subsequently trained on the concatenated outputs of the frozen expert models to prevent exploding gradients from destroying the specialized representations of the individual engines. We utilize the AdamW optimizer ($\mathrm{lr}{=}10^{-3}$, weight decay $10^{-4}$, batch size~64) coupled with a Cosine Annealing learning rate schedule with warm restarts ($T_0=10, T_{\mathrm{mult}}=2$). All GRU and BiLSTM layers are initialized with orthogonal weights to strictly mitigate vanishing gradients over the $T=120$ inference horizon. Implementation uses PyTorch~1.13 and training was accelerated utilizing dual NVIDIA A100 (80GB) Tensor Core GPUs, requiring approximately 4.5~hours for convergence across all component variants. The dataset partitions follow a strictly enforced 80/20 train/test split with zero identity overlap across the manifold boundary.
 
 \subsection{Evaluation Metrics}
 
