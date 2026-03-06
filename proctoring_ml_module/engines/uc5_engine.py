@@ -48,7 +48,7 @@ class UC5Engine:
     def reset(self):
         self.buffer.clear()
 
-    def update(self, uc1_sim: float, uc2_prob: float, uc3_presence: float, uc4_drift: float, gam_gaze: float, hgdm_prob: float) -> float:
+    def update(self, uc1_sim: float, uc2_prob: float, uc3_presence: float, uc4_drift: float, gam_gaze: float, hgdm_prob: float) -> tuple[float, float]:
 
         self.buffer.append([uc1_sim, uc2_prob, uc3_presence, uc4_drift, gam_gaze, hgdm_prob])
 
@@ -60,7 +60,8 @@ class UC5Engine:
         ).unsqueeze(0).to(self.device)
 
         with torch.no_grad():
-            _, final_risk = self.model(input_tensor)
-            risk_val = torch.sigmoid(final_risk).item()
+            _, final_risk, _, final_uncertainty = self.model(input_tensor)
+            risk_val = final_risk.item()
+            uncertainty_val = final_uncertainty.item()
 
-        return risk_val
+        return risk_val, uncertainty_val

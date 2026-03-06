@@ -126,16 +126,19 @@ class RiskFusionGRU(nn.Module):
             batch_first=True
         )
 
-        self.risk_head = nn.Linear(hidden_dim, 1)
+        self.risk_head = nn.Linear(hidden_dim, 2)
 
     def forward(self, x):
 
         h_seq, _ = self.gru(x)
 
-        risk_logits = self.risk_head(h_seq)
+        output = self.risk_head(h_seq)
+        mu, log_var = output.chunk(2, dim=-1)
 
-        risk_traj = risk_logits.squeeze(-1)
+        risk_traj = torch.sigmoid(mu).squeeze(-1)
+        uncertainty_traj = torch.exp(0.5 * log_var).squeeze(-1)
 
         final_risk = risk_traj[:, -1]
+        final_uncertainty = uncertainty_traj[:, -1]
 
-        return risk_traj, final_risk
+        return risk_traj, final_risk, uncertainty_traj, final_uncertainty

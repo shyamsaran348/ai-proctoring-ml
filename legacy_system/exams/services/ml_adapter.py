@@ -49,6 +49,7 @@ class MLProctoringAdapter:
             'uc3_presence': 0.5,
             'uc4_drift': 0.0,
             'risk_score': 0.0,
+            'uncertainty': 0.0,
 
             # Maintaining legacy keys to prevent frontend crashes,
             # but mapping them to ML context where possible.
@@ -135,6 +136,7 @@ class MLProctoringAdapter:
                 self.history.append({
                     'timestamp': time.time(),
                     'risk': metrics['risk'],
+                    'uncertainty': metrics.get('uncertainty', 0.0),
                     'uc1': metrics['uc1_similarity']
                 })
 
@@ -243,6 +245,7 @@ class MLProctoringAdapter:
         self.latest_status['gam_gaze']         = metrics.get('gam_gaze', 0.5)
         self.latest_status['hgdm_prob']        = metrics.get('hgdm_prob', 0.5)
         self.latest_status['risk_score']       = risk_score
+        self.latest_status['uncertainty']      = metrics.get('uncertainty', 0.0)
         self.latest_status['last_update']      = time.time()
         self.latest_status['is_active']        = True
         self.latest_status['num_faces']        = num_faces
@@ -275,6 +278,7 @@ class MLProctoringAdapter:
             'uc4':   metrics.get('uc4_drift', 0.0),
             'gam':   metrics.get('gam_gaze', 0.5),
             'hgdm':  metrics.get('hgdm_prob', 0.5),
+            'uncertainty': metrics.get('uncertainty', 0.0),
         })
 
     def get_live_status(self):

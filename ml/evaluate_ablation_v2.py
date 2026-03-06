@@ -34,7 +34,7 @@ def evaluate_ablation():
         model_4.load_state_dict(torch.load(MODEL_4_PATH, map_location=DEVICE))
         model_4.eval()
         with torch.no_grad():
-            _, risk_logits_4 = model_4(X_4)
+            _, risk_logits_4, _, _ = model_4(X_4)
             probs_4 = torch.sigmoid(risk_logits_4).cpu().numpy()
             auc_4 = roc_auc_score(y, probs_4)
             print(f"  4-Signal AUC: {auc_4:.4f}")
@@ -49,7 +49,7 @@ def evaluate_ablation():
         model_5.load_state_dict(torch.load(MODEL_5_PATH, map_location=DEVICE))
         model_5.eval()
         with torch.no_grad():
-            _, risk_logits_5 = model_5(X_tensor)
+            _, risk_logits_5, _, _ = model_5(X_tensor)
             probs_5 = torch.sigmoid(risk_logits_5).cpu().numpy()
             auc_5 = roc_auc_score(y, probs_5)
             print(f"  5-Signal AUC: {auc_5:.4f}")

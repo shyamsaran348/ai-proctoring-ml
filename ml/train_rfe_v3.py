@@ -34,7 +34,7 @@ def train_rfe_v3():
     
     # Model (6 inputs)
     model = RiskFusionGRU(input_dim=6, hidden_dim=32)
-    criterion = nn.BCEWithLogitsLoss()
+    criterion = nn.BCELoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
     
     epochs = 20
@@ -47,7 +47,7 @@ def train_rfe_v3():
         for bx, by in train_loader:
             bx, by = bx.to(device), by.to(device)
             optimizer.zero_grad()
-            risk_traj, final_logits = model(bx)
+            _, final_logits, _, _ = model(bx)
             loss = criterion(final_logits, by)
             loss.backward()
             optimizer.step()
@@ -58,7 +58,7 @@ def train_rfe_v3():
         with torch.no_grad():
             for bx, by in val_loader:
                 bx, by = bx.to(device), by.to(device)
-                _, out = model(bx)
+                _, out, _, _ = model(bx)
                 val_loss += criterion(out, by).item()
                 
         if (epoch+1) % 5 == 0:

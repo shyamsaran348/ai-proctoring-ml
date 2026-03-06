@@ -240,7 +240,7 @@ def architecture():
 
     # ── Output ──
     draw_rect(ax, 5.5, 1.2, 3.5, 0.8,
-              "Risk Trajectory\n$\\rho_t = \\sigma(W_o h_t + b_o)$")
+              "Risk & Uncertainty Trajectory\n$[\\mu_t, \\log \\sigma_t^2]^\\top = W_o h_t + b_o$")
     orth_arrow(ax, (5.5, 2.9), (5.5, 1.6))
     
     # Final output label
@@ -293,7 +293,7 @@ def workflow():
     draw_rect(ax, cx, 6.4, 5.0, 0.8, "Update Temporal Windows\nIIM($S_t$), LDD($\\delta_t$), PAM(Presence), GAM(Gaze)")
     orth_arrow(ax, (cx, 7.1), (cx, 6.8))
     
-    draw_rect(ax, cx, 5.3, 5.0, 0.8, "Update Risk State\nRFE GRU: $\\rho_t = f(S_t, I_t, P_t, D_t, G_t)$")
+    draw_rect(ax, cx, 5.3, 5.0, 0.8, "Update Risk State\nRFE GRU: $(\\rho_t, \\sigma_t) = f(S_t, I_t, P_t, D_t, G_t, H_t)$")
     orth_arrow(ax, (cx, 6.0), (cx, 5.7))
     
     draw_diamond(ax, cx, 4.1, 2.5, 1.0, "Is $t == T$ ?")
@@ -310,7 +310,7 @@ def workflow():
     orth_arrow(ax, (cx, 3.6), (cx, 2.3))
     ax.text(cx, 3.0, "Yes", ha='center', va='center', fontsize=9, fontweight='bold', bbox=dict(facecolor='white', edgecolor='none', pad=2))
     
-    draw_rect(ax, cx, 1.9, 3.5, 0.8, "Commit Final Risk $\\rho_T$\n(No Thresholds Applied)")
+    draw_rect(ax, cx, 1.9, 3.5, 0.8, "Commit Final Risk $(\\rho_T, \\sigma_T)$\n(No Thresholds Applied)")
     draw_oval(ax, cx, 0.8, 2.0, 0.6, "Session End")
     orth_arrow(ax, (cx, 1.5), (cx, 1.1))
 

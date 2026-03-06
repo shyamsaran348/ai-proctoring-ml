@@ -28,7 +28,7 @@ shyamsaran348@gmail.com}
 \maketitle
 
 \begin{abstract}
-We propose a shift in automated online proctoring from instantaneous rule-based event detection to multi-signal temporal behavioral inference. Our framework integrates seven neural components: a one-shot identity embedder (IDE), an identity instability monitor (IIM), a presence and attentiveness model (PAM), a long-horizon drift detector (LDD), a gaze attentiveness model (GAM), a head-gaze dynamics model (HGDM), and a GRU-based risk fusion engine (RFE). Unlike traditional systems that flag isolated threshold violations, our approach treats individual behavioral markers as weak signals whose diagnostic power emerges through temporal evidence accumulation. Each component produces a continuous signal ($S_t, I_t, P_t, D_t, G_t, H_t$) that is fused into a session-level probabilistic risk trajectory $\rho_t$. Evaluation on 5{,}000 synthetic sessions demonstrates that temporal accumulation achieves high-confidence session verdicts (ROC-AUC 0.9992) from individually low-confidence frame-level markers (ROC-AUC 0.64--0.94), effectively suppressing false positives caused by instantaneous noise.
+We propose a shift in automated online proctoring from instantaneous rule-based event detection to multi-signal temporal behavioral inference. Our framework integrates seven neural components: a one-shot identity embedder (IDE), an identity instability monitor (IIM), a presence and attentiveness model (PAM), a long-horizon drift detector (LDD), a gaze attentiveness model (GAM), a head-gaze dynamics model (HGDM), and a GRU-based risk fusion engine (RFE). Unlike traditional systems that flag isolated threshold violations, our approach treats individual behavioral markers as weak signals whose diagnostic power emerges through temporal evidence accumulation. Each component produces a continuous signal ($S_t, I_t, P_t, D_t, G_t, H_t$) that is fused into a session-level Gaussian risk trajectory $\mathcal{N}(\mu_t, \sigma_t^2)$, yielding both a risk probability $\rho_t$ and an explicit prediction confidence $\sigma_t$. Evaluation on 5{,}000 synthetic sessions demonstrates that temporal accumulation achieves high-confidence session verdicts (ROC-AUC 0.9992) from individually low-confidence frame-level markers (ROC-AUC 0.64--0.94). The integration of continuous uncertainty explicitly prevents automated false positive accusations caused by instantaneous noise.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -101,7 +101,7 @@ The core of the system is the \textbf{Risk Fusion Engine (RFE)}, a Gated Recurre
 \begin{equation}
     h_t = \text{GRU}\bigl([S_t, I_t, P_t, D_t, G_t, H_t],\; h_{t-1}\bigr)
 \end{equation}
-The risk output $\rho_t = \sigma(W_o h_t + b_o)$ is a continuous probability $\in [0, 1]$, trained end-to-end via binary cross-entropy between the predicted trajectory $\rho_{1:T}$ and the session-level ground-truth label.
+Rather than extreme point estimation, the system projects the hidden state into a two-parameter Gaussian distribution $[\mu_t, \log \sigma_t^2]^\top = W_o h_t + b_o$. The risk output $\rho_t = \sigma(\mu_t)$ is a continuous probability $\in [0, 1]$, trained end-to-end alongside the uncertainty metric $\sigma_t$, allowing the architecture to quantify its own confidence.
 
 \begin{figure}[!t]
 \centerline{\includegraphics[width=\columnwidth]{workflow.png}}
@@ -409,6 +409,9 @@ A natural question is: \textit{why not improve the face matcher beyond AUC 0.64?
 \subsection{Role of the Head-Gaze Dynamics Model}
 The HGDM specifically targets complex cheating patterns where individual modalities are tricked but their \emph{correlation} is broken. As shown in Figure~\ref{fig:decoupling}, normal behavior maintains a strong coupling between head pose and gaze direction, while anomalies like phone usage create measurable distribution shifts. This cross-modal consistency check adds a detection dimension that is orthogonal to identity-based signals.
 
+\subsection{Uncertainty-Aware False Positive Mitigation}
+A major challenge with automated proctoring is the generation of unjustified flags due to environmental noise. Our integration of continuous uncertainty estimation ($\sigma_t$) addresses this by decoupling the risk magnitude ($\rho_t$) from prediction confidence. This allows institutions to implement dual-threshold policies: high-risk/low-uncertainty events are flagged for review, while high-risk/high-uncertainty events (often caused by poor lighting or occlusion) can be discarded, explicitly protecting examinees from algorithmic brittleness.
+
 \subsection{Why LDD Ablation Causes the Largest Drop}
 LDD is the only component accumulating the full 120 frames of embedding displacement. Short-window models completely miss slow substitution drift---the most sophisticated attack vector. The marginal gain of the GRU over the flattened MLP reflects the value of \textbf{ordered temporal representation}: knowing \emph{when} evidence appears relative to the session timeline carries diagnostic information.
 
@@ -426,7 +429,7 @@ LDD is the only component accumulating the full 120 frames of embedding displace
 \section{Conclusion}
 % ===================================================================
 
-We present a proctoring framework that replaces brittle thresholds with a continuous, probabilistic risk engine. The system's primary contribution is the demonstration of \textbf{temporal behavioral inference}: achieving a session-level ROC-AUC of 0.9992 by fusing six signals that are individually weak (AUC 0.64--0.94). This proves that temporal accumulation captures behavioral intent rather than instantaneous snapshots, enabling deployment in low-cost, uncontrolled hardware environments without the high false-trigger rates endemic to rule-based tools. By outputting a continuous risk probability rather than a binary verdict, the system empowers human proctors with prioritized evidence rather than replacing them with opaque algorithms.
+We present a proctoring framework that replaces brittle thresholds with a continuous, probabilistic risk engine. The system's primary contribution is the demonstration of \textbf{temporal behavioral inference}: achieving a session-level ROC-AUC of 0.9992 by fusing six signals that are individually weak (AUC 0.64--0.94). This proves that temporal accumulation captures behavioral intent rather than instantaneous snapshots, enabling deployment in low-cost, uncontrolled hardware environments without the high false-trigger rates endemic to rule-based tools. Furthermore, by outputting both a continuous risk probability and a dynamic uncertainty metric ($\sigma_t$), the system empowers human proctors with prioritized, confidence-aware evidence rather than replacing them with opaque algorithms.
 
 \textbf{Future work.} (1)~Integrating ordinal risk labels to distinguish minor distractions from severe integrity breaches. (2)~Deploying lightweight backbones (MobileNetV3) to achieve real-time CPU inference. (3)~Validating signal distributions against diverse, real-world labeled datasets.
 

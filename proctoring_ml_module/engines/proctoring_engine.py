@@ -124,7 +124,9 @@ class ProctoringEngine:
                 "uc3_presence": float or None,
                 "uc4_drift": float,
                 "gam_gaze": float,
-                "risk": float
+                "hgdm_prob": float,
+                "risk": float,
+                "uncertainty": float
             }
         """
 
@@ -145,7 +147,9 @@ class ProctoringEngine:
                 "uc3_presence": 0.0,
                 "uc4_drift": 1.0,
                 "gam_gaze": 0.5,
-                "risk": 1.0
+                "hgdm_prob": 0.5,
+                "risk": 1.0,
+                "uncertainty": 1.0
             }
 
         uc1_sim = self.uc1.compute_similarity(
@@ -204,7 +208,7 @@ class ProctoringEngine:
         # UC5 — Risk Fusion (Now 6-Signal)
         # ------------------------------------------------------
 
-        risk = self.uc5.update(
+        risk, uncertainty = self.uc5.update(
             uc1_sim,
             uc2_prob,
             presence_prob,
@@ -220,7 +224,8 @@ class ProctoringEngine:
             f"Drift: {uc4_drift:.4f} | "
             f"Gaze: {g_t_prob:.4f} | "
             f"HGDM: {h_t_prob:.4f} | "
-            f"Risk: {risk:.4f}"
+            f"Risk: {risk:.4f} | "
+            f"Uncertainty: {uncertainty:.4f}"
         )
 
         return {
@@ -230,7 +235,8 @@ class ProctoringEngine:
             "uc4_drift": uc4_drift,
             "gam_gaze": g_t_prob,
             "hgdm_prob": h_t_prob,
-            "risk": risk
+            "risk": risk,
+            "uncertainty": uncertainty
         }
 
     

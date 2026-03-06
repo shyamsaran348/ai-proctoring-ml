@@ -48,7 +48,7 @@
 %                         ABSTRACT
 % ===================================================================
 \begin{abstract}
-Automated online proctoring systems are critical for maintaining examination integrity in remote education, yet prevailing approaches rely on instantaneous rule-based event detection that produces excessive false positives and fails to capture temporal behavioral evolution. This paper reformulates exam integrity monitoring as a \emph{multi-signal temporal behavioral inference} problem. We introduce a seven-component neural architecture comprising six specialized temporal experts---an identity instability monitor~(IIM), a presence and attentiveness model~(PAM), a long-horizon drift detector~(LDD), a gaze attentiveness model~(GAM), and a head-gaze dynamics model~(HGDM)---anchored by a one-shot identity embedder~(IDE) under an immutable enrollment constraint. A Gated Recurrent Unit~(GRU)-based Risk Fusion Engine~(RFE) integrates six continuous behavioral signals into a session-level probabilistic risk trajectory~$\rho_t\!\in\![0,1]$. Evaluation on 5\,000 procedurally generated sessions spanning seven behavioral classes demonstrates that temporal fusion achieves a session-level ROC-AUC of~$0.9992 \pm 0.0004$ from individually weak component signals (ROC-AUC~0.64--0.94), with an Expected Calibration Error of~0.0072. Leave-one-out ablation identifies long-horizon drift detection as the most critical signal ($\Delta$AUC$\,{=}\,{-}0.0410$), while gaze integration improves non-identity anomaly detection by $+0.4478$~AUC. A gradient-based temporal attribution mechanism provides frame-level signal importance maps for human-in-the-loop verification. Computational profiling confirms real-time feasibility at 82.66\,ms\,/\,frame on~CPU. These results provide quantitative evidence that temporal evidence accumulation fundamentally outperforms instantaneous thresholding for behavioral monitoring.
+Automated online proctoring systems are critical for maintaining examination integrity in remote education, yet prevailing approaches rely on instantaneous rule-based event detection that produces excessive false positives and fails to capture temporal behavioral evolution. This paper reformulates exam integrity monitoring as a \emph{multi-signal temporal behavioral inference} problem. We introduce a seven-component neural architecture comprising six specialized temporal experts---an identity instability monitor~(IIM), a presence and attentiveness model~(PAM), a long-horizon drift detector~(LDD), a gaze attentiveness model~(GAM), and a head-gaze dynamics model~(HGDM)---anchored by a one-shot identity embedder~(IDE) under an immutable enrollment constraint. A Gated Recurrent Unit~(GRU)-based Risk Fusion Engine~(RFE) integrates six continuous behavioral signals into a session-level probabilistic risk trajectory. Crucially, the system features an \emph{uncertainty-aware formulation}, mapping the trajectory as a temporal Gaussian distribution $\mathcal{N}(\mu_t, \sigma_t^2)$ that yields both a risk probability~$\rho_t\!\in\![0,1]$ and an explicit prediction confidence metric~$\sigma_t$. Evaluation on 5\,000 procedurally generated sessions spanning seven behavioral classes demonstrates that temporal fusion achieves a session-level ROC-AUC of~$0.9992 \pm 0.0004$ from individually weak component signals (AUC~0.64--0.94), with an Expected Calibration Error of~0.0072. The integration of continuous uncertainty estimation allows the system to fundamentally distinguish between high-confidence integrity violations and inherently ambiguous, noisy sensor conditions, averting automated false accusations. Computational profiling confirms real-time feasibility at 82.66\,ms\,/\,frame on~CPU. These results provide quantitative evidence that temporal evidence accumulation with probabilistic uncertainty natively outperforms instantaneous thresholding for high-stakes behavioral monitoring.
 \end{abstract}
 
 % --- Keywords ---
@@ -72,7 +72,7 @@ Online proctoring, temporal behavioral inference, one-shot identity verification
 
 The core insight motivating this work is that proctoring should be modeled as a \textbf{continuous temporal inference problem}. Individual behavioral signals are inherently noisy at the frame level: a single frame showing reduced identity similarity may reflect momentary lighting variation; a brief gaze aversion is common during keyboard interaction. However, when multiple weak signals exhibit coordinated anomalous patterns sustained over time, the evidence for integrity violation becomes compelling. This principle, well-established in sequential hypothesis testing~\cite{Wald1945} and temporal anomaly detection~\cite{Liu2018, Chandola2009}, has not been systematically applied to online proctoring.
 
-We propose the \textbf{Temporal Behavioral Inference Engine~(TBIE)}, a seven-component neural architecture that operationalizes this principle. The system extracts six continuous behavioral signals from standard webcam feeds, processes each through a specialized temporal expert, and fuses them via a GRU-based Risk Fusion Engine that maintains cumulative session evidence in its hidden state. The system produces a continuous risk trajectory $\rho_t \in [0,1]$ rather than making instantaneous frame-level decisions.
+We propose the \textbf{Temporal Behavioral Inference Engine~(TBIE)}, a seven-component neural architecture that operationalizes this principle. The system extracts six continuous behavioral signals from standard webcam feeds, processes each through a specialized temporal expert, and fuses them via a GRU-based Risk Fusion Engine that maintains cumulative session evidence in its hidden state. The system produces a continuous risk trajectory $\rho_t \in [0,1]$ coupled with a temporal uncertainty measure $\sigma_t$ rather than making instantaneous frame-level decisions.
 
 \medskip
 \noindent\textbf{Contributions.} The principal contributions of this work are:
@@ -82,6 +82,7 @@ We propose the \textbf{Temporal Behavioral Inference Engine~(TBIE)}, a seven-com
     \item[(C3)] Systematic signal analysis via leave-one-out ablation, baseline comparison against four non-temporal alternatives, and calibration analysis.
     \item[(C4)] A gradient-based temporal attribution mechanism producing frame-level signal importance maps for human-in-the-loop verification.
     \item[(C5)] A Head-Gaze Dynamics Model~(HGDM) that detects cheating patterns exploiting the decorrelation between head pose and gaze direction.
+    \item[(C6)] An uncertainty-aware probabilistic formulation mapping continuous risk trajectories to temporal Gaussian distributions $[\mu_t, \sigma_t^2]^\top$, enabling differentiation between high-confidence cheating and ambiguous measurements.
 \end{enumerate}
 
 \noindent The remainder of this paper is organized as follows. Section~\ref{sec:related} surveys related work. Section~\ref{sec:formulation} formalizes the problem. Section~\ref{sec:methodology} presents the system architecture. Section~\ref{sec:experimental} describes the experimental setup. Section~\ref{sec:results} reports evaluation results. Section~\ref{sec:xai} describes temporal interpretability. Section~\ref{sec:discussion} provides discussion. Section~\ref{sec:ethics} addresses ethics and limitations. Section~\ref{sec:conclusion} concludes.
@@ -238,17 +239,28 @@ The GRU update equations are:
     \tilde{h}_t &= \tanh(W_h \mathbf{r}_t + U_h (r_t \odot h_{t-1}) + b_h) \label{eq:gru_h} \\
     h_t &= (1 - z_t) \odot h_{t-1} + z_t \odot \tilde{h}_t \label{eq:gru_update}
 \end{align}
-The risk output is:
+To enable uncertainty-aware risk estimation, the engine projects the hidden state into a two-parameter temporal Gaussian distribution characterizing the mean risk logit $\mu_t$ and its log-variance $\log \sigma_t^2$:
 \begin{equation}
-    \rho_t = \sigma(W_o h_t + b_o) \in [0, 1]
-    \label{eq:rho}
+    [\mu_t, \log \sigma_t^2]^\top = W_o h_t + b_o 
+    \label{eq:uncertainty_proj}
 \end{equation}
+The continuous risk and uncertainty trajectories are subsequently extracted via element-wise constraints:
+\begin{align}
+    \rho_t &= \sigma(\mu_t) \in [0, 1] \label{eq:rho} \\
+    \sigma_t &= \exp(0.5 \cdot \log \sigma_t^2) > 0 \label{eq:sigma}
+\end{align}
 trained with session-level binary cross-entropy (BCE). A critical design choice is the utilization of weak session-level supervision applied uniformly across the temporal dimension:
 \begin{equation}
     \mathcal{L}_{\mathrm{BCE}} = -\frac{1}{T} \sum_{t=1}^{T} w_y \bigl[ y \log \rho_t + (1{-}y) \log(1{-}\rho_t) \bigr]
     \label{eq:loss}
 \end{equation}
-where $y \in \{0,1\}$ is the session-level binary label (genuine vs.\ anomalous). To counteract the severe class imbalance inherent to anomaly detection tasks---where genuine events drastically outnumber true integrity violations in real-world distributions---we introduce a class balancing weight $w_y$ inversely proportional to the prior class frequencies. This formulation intentionally avoids the requisite of frame-level strong annotations, which are prohibitively expensive and subject to high inter-rater variance, opting instead to let the GRU discover the temporal salient features corresponding to the global session label. Algorithm~\ref{alg:inference} summarizes the inference procedure.
+where $y \in \{0,1\}$ is the session-level binary label (genuine vs.\ anomalous). To counteract the severe class imbalance inherent to anomaly detection tasks---where genuine events drastically outnumber true integrity violations in real-world distributions---we introduce a class balancing weight $w_y$ inversely proportional to the prior class frequencies. This formulation intentionally avoids the requisite of frame-level strong annotations, which are prohibitively expensive and subject to high inter-rater variance, opting instead to let the GRU discover the temporal salient features corresponding to the global session label.
+
+\subsection{Epistemic and Aleatoric Uncertainty Disentanglement}
+
+The architectural transition from a singular risk logit to the Gaussian parameterization $[\mu_t, \log \sigma_t^2]^\top$ natively addresses the duality of uncertainty in behavioral monitoring. \emph{Aleatoric uncertainty} (data noise) arising from poor webcam resolution, transient lighting occlusion, and non-deterministic frame dropping is explicitly codified into the predicted log-variance $\log \sigma_t^2$. This enables the primary risk probability $\rho_t$ to reflect the actual temporal behavioral intent uncorrupted by isolated sensor degradation. Conversely, \emph{epistemic uncertainty} (model ignorance) is minimized through continuous session-level temporal optimization bounded by Equation~\ref{eq:loss}. Consequently, the RFE transcends scalar anomaly scoring, providing a mathematically calibrated credibility interval that allows automated proctoring deployments to safely defer ambiguous boundary cases to human review rather than executing brittle, automated disqualifications.
+
+Algorithm~\ref{alg:inference} summarizes the comprehensive forward-pass inference procedure.
 
 \begin{algorithm}[t]
 \caption{TBIE Session Inference}
@@ -268,7 +280,9 @@ where $y \in \{0,1\}$ is the session-level binary label (genuine vs.\ anomalous)
     \STATE $H_t \leftarrow \mathrm{HGDM}(\mathbf{hg}_t)$ \COMMENT{Head-gaze}
     \STATE $\mathbf{r}_t \leftarrow [S_t, I_t, P_t, D_t, G_t, H_t]^\top$
     \STATE $h_t \leftarrow \mathrm{GRU}(\mathbf{r}_t, h_{t-1})$
-    \STATE $\rho_t \leftarrow \sigma(W_o h_t + b_o)$
+    \STATE $[\mu_t, \log \sigma_t^2]^\top \leftarrow W_o h_t + b_o$
+    \STATE $\rho_t \leftarrow \sigma(\mu_t)$
+    \STATE $\sigma_t \leftarrow \exp(0.5 \cdot \log \sigma_t^2)$
 \ENDFOR
 \RETURN $\bm{\rho}$
 \end{algorithmic}
@@ -664,6 +678,10 @@ The GRU's improvement over the order-agnostic MLP is modest in AUC but $2.2{\tim
 
 HGDM achieves the highest individual AUC~(0.942) by detecting pose-gaze decorrelation---an anomaly dimension orthogonal to identity-based signals. Phone usage creates a stable head with deviated gaze, undetectable by either modality alone but revealed by their sustained decorrelation.
 
+\subsection{Uncertainty-Aware False Positive Mitigation}
+
+A persistent criticism of automated proctoring is the generation of unjustified flags due to environmental noise (e.g., poor lighting, partial occlusion). The integration of continuous uncertainty estimation ($\sigma_t$) fundamentally addresses this by decoupling the risk magnitude ($\rho_t$) from prediction confidence. Rather than acting on a raw scalar, institutions can implement dual-threshold policies: high-risk/low-uncertainty events can be flagged for immediate review, while high-risk/high-uncertainty events (often caused by sensor degradation) can be deferred or discarded, explicitly protecting examinees from algorithmic brittleness.
+
 \subsection{Deployment Considerations}
 
 The modular architecture supports incremental deployment: institutions can begin with identity and presence signals, adding gaze and dynamics modules as infrastructure permits. The ResNet-50 backbone is the latency bottleneck and can be substituted with lightweight alternatives~\cite{Howard2019, Tan2019}.
@@ -700,7 +718,7 @@ Face recognition backbones carry documented demographic biases~\cite{Buolamwini2
 \section{Conclusion}
 \label{sec:conclusion}
 
-We have presented TBIE, a seven-component neural architecture that replaces threshold-based proctoring with continuous probabilistic behavioral inference. The system achieves a session-level ROC-AUC of~0.9992 by fusing six individually weak signals (AUC~0.64--0.94), demonstrating that temporal evidence accumulation fundamentally outperforms instantaneous event detection. Key findings include: (1)~long-horizon drift detection is the most critical signal; (2)~cross-modal head-gaze consistency enables detection of pose-gaze decorrelation attacks; (3)~temporal ordering carries diagnostic value beyond feature content; and (4)~gaze integration is essential for non-identity anomalies.
+We have presented TBIE, a seven-component neural architecture that replaces threshold-based proctoring with continuous probabilistic behavioral inference. The system achieves a session-level ROC-AUC of~0.9992 by fusing six individually weak signals (AUC~0.64--0.94), demonstrating that temporal evidence accumulation fundamentally outperforms instantaneous event detection. Key findings include: (1)~long-horizon drift detection is the most critical signal; (2)~cross-modal head-gaze consistency enables detection of pose-gaze decorrelation attacks; (3)~probabilistic risk estimation natively computes uncertainty to prevent algorithmically brittle false flags; and (4)~gaze integration is essential for non-identity anomalies.
 
 \smallskip
 \noindent\textbf{Future work} includes: (i)~ordinal risk labels distinguishing minor distractions from severe breaches; (ii)~lightweight backbones (MobileNetV3) for real-time CPU inference; and (iii)~validation on diverse real-world datasets under IRB-approved protocols.

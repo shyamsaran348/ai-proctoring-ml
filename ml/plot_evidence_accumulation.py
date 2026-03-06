@@ -30,13 +30,20 @@ def generate_evidence_diagram():
     # Cumulative Risk Trajectory (The Sigma Signal)
     # Starts low, steadily grows as evidence (low G_t) accumulates
     risk = np.zeros(120)
+    uncertainty = np.zeros(120)
     current_risk = 0.05
     for i in range(120):
-        # simplified logic: if gaze is low, increase risk
         if i > 40:
             evidence = (0.9 - g_t[i]) * 0.05
             current_risk += evidence
-        risk[i] = 1 / (1 + np.exp(-(current_risk - 0.5) * 10)) # Sigmoid for visualization
+        risk[i] = 1 / (1 + np.exp(-(current_risk - 0.5) * 10))
+        
+        # Simulate uncertainty: spikes during transitions, then settles
+        if i < 40:
+            uncertainty[i] = 0.03 + 0.01 * rng.normal()
+        else:
+            uncertainty[i] = 0.05 + 0.2 * np.exp(-((i - 60)**2) / 100) + 0.01 * rng.normal()
+    uncertainty = np.clip(uncertainty, 0.01, 0.3)
     
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8), sharex=True, gridspec_kw={'height_ratios': [2, 1]})
     
@@ -51,10 +58,10 @@ def generate_evidence_diagram():
     ax1.grid(alpha=0.2)
     ax1.set_ylim(0, 1.1)
     
-    # Bottom Plot: The Fused Risk Result
-    ax2.fill_between(t, 0, risk, color='#e74c3c', alpha=0.2)
+    # Bottom Plot: The Fused Risk Result & Uncertainty
+    ax2.fill_between(t, np.clip(risk - uncertainty, 0, 1), np.clip(risk + uncertainty, 0, 1), color='#e74c3c', alpha=0.3, label=r'Uncertainty ($\pm\sigma_t$)')
     ax2.plot(t, risk, color='#c0392b', lw=2.5, label='Accumulated Risk ($\\rho_t$)')
-    ax2.set_ylabel('Risk Probability')
+    ax2.set_ylabel('Probability')
     ax2.set_xlabel('Time (Session Evolution)')
     ax2.set_title('Stage 2: Temporal Evidence Accumulation (RFE Result)', fontweight='bold')
     ax2.set_ylim(0, 1.1)

@@ -975,156 +975,142 @@
         <!-- UC5 Gaze -->
         <div class="signal-row">
           <span class="signal-label">UC5 Gaze</span>
-          <div class="signal-track">
-            <div class="signal-fill" id="bar-uc5" style="background:#06b6d4;"></div>
+          <div class="sparkline-wrap" id="sparkline-wrap">
+            <div style="display:flex; align-items:center; margin-bottom:4px;">
+              <span class="sparkline-label">Risk Trajectory</span>
+              <span class="risk-badge low" id="risk-badge">LOW</span>
+              <span style="margin-left:auto; font-family:var(--font-code); font-size:11px;" id="risk-val">0.0000</span>
+            </div>
+            <svg id="sparkline-svg" width="100%" height="32" viewBox="0 0 272 32" preserveAspectRatio="none"
+              style="display:block;">
+              <polyline id="sparkline-line" points="" fill="none" stroke="#4f46e5" stroke-width="1.5"
+                stroke-linejoin="round" stroke-linecap="round" />
+            </svg>
           </div>
-          <span class="signal-val" id="val-uc5">—</span>
-        </div>
-        <!-- UC6 Head-Gaze -->
-        <div class="signal-row">
-          <span class="signal-label">UC6 Head-Gaze</span>
-          <div class="signal-track">
-            <div class="signal-fill" id="bar-uc6" style="background:#8b5cf6;"></div>
+
+          <div id="proctoring-warnings" class="proctor-warnings">
+            <!-- Warnings appear here -->
           </div>
-          <span class="signal-val" id="val-uc6">—</span>
         </div>
-      </div>
 
-      <!-- ── Risk Sparkline ──────────────────────────────── -->
-      <div class="sparkline-wrap" id="sparkline-wrap">
-        <div style="display:flex; align-items:center; margin-bottom:4px;">
-          <span class="sparkline-label">Risk Trajectory</span>
-          <span class="risk-badge low" id="risk-badge">LOW</span>
-          <span style="margin-left:auto; font-family:var(--font-code); font-size:11px;" id="risk-val">0.0000</span>
+        <!-- Help Modal -->
+        <div id="proctor-help-overlay" class="modal-overlay" style="display:none; z-index:9999;">
+          <div class="modal" style="max-width: 400px; text-align: left;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+              <h3 style="margin:0;">Proctoring Signals</h3>
+              <button onclick="toggleProctorHelp()"
+                style="background:none; border:none; font-size:20px; cursor:pointer;">&times;</button>
+            </div>
+            <ul style="border-left: 3px solid var(--primary); padding-left: 12px; list-style:none; line-height:1.6;">
+              <li style="margin-bottom:10px;">
+                <strong>UC1 Identity (↑ good):</strong> Cosine similarity between current frame and enrollment
+                embedding.
+                Should stay > 0.6.
+              </li>
+              <li style="margin-bottom:10px;">
+                <strong>UC2 Instability (↓ good):</strong> Temporal pattern of identity switches. High value indicates
+                suspicious substitution.
+              </li>
+              <li style="margin-bottom:10px;">
+                <strong>UC3 Presence (↑ good):</strong> Attentiveness model — face confidence, head pose, motion energy.
+              </li>
+              <li style="margin-bottom:10px;">
+                <strong>UC4 Drift (↓ good):</strong> Long-horizon drift detector across 120 frames. Catches slow
+                substitution.
+              </li>
+              <li>
+                <strong>Risk Score:</strong> GRU-fused session risk ∈ [0,1]. Low &lt; 0.3, Medium 0.3–0.7, High &gt;
+                0.7.
+              </li>
+              <li style="margin-top:10px;">
+                <strong>UC5 Gaze (↑ good):</strong> Gaze Attentiveness Model — BiLSTM over eye gaze features. Low value
+                indicates looking away.
+              </li>
+              <li style="margin-top:10px;">
+                <strong>UC6 Head-Gaze (↑ good):</strong> Head-Gaze Dynamics Model — detects decoupling between head pose
+                and gaze direction (e.g. phone usage).
+              </li>
+            </ul>
+          </div>
         </div>
-        <svg id="sparkline-svg" width="100%" height="32" viewBox="0 0 272 32" preserveAspectRatio="none"
-          style="display:block;">
-          <polyline id="sparkline-line" points="" fill="none" stroke="#4f46e5" stroke-width="1.5"
-            stroke-linejoin="round" stroke-linecap="round" />
-        </svg>
+
       </div>
 
-      <div id="proctoring-warnings" class="proctor-warnings">
-        <!-- Warnings appear here -->
-      </div>
-    </div>
+      <!-- HIDDEN BUTTON -->
+      <button id="back-button" class="hidden" onclick="goBack()"></button>
 
-    <!-- Help Modal -->
-    <div id="proctor-help-overlay" class="modal-overlay" style="display:none; z-index:9999;">
-      <div class="modal" style="max-width: 400px; text-align: left;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-          <h3 style="margin:0;">Proctoring Signals</h3>
-          <button onclick="toggleProctorHelp()"
-            style="background:none; border:none; font-size:20px; cursor:pointer;">&times;</button>
-        </div>
-        <ul style="border-left: 3px solid var(--primary); padding-left: 12px; list-style:none; line-height:1.6;">
-          <li style="margin-bottom:10px;">
-            <strong>UC1 Identity (↑ good):</strong> Cosine similarity between current frame and enrollment embedding.
-            Should stay > 0.6.
-          </li>
-          <li style="margin-bottom:10px;">
-            <strong>UC2 Instability (↓ good):</strong> Temporal pattern of identity switches. High value indicates
-            suspicious substitution.
-          </li>
-          <li style="margin-bottom:10px;">
-            <strong>UC3 Presence (↑ good):</strong> Attentiveness model — face confidence, head pose, motion energy.
-          </li>
-          <li style="margin-bottom:10px;">
-            <strong>UC4 Drift (↓ good):</strong> Long-horizon drift detector across 120 frames. Catches slow
-            substitution.
-          </li>
-          <li>
-            <strong>Risk Score:</strong> GRU-fused session risk ∈ [0,1]. Low &lt; 0.3, Medium 0.3–0.7, High &gt; 0.7.
-          </li>
-          <li style="margin-top:10px;">
-            <strong>UC5 Gaze (↑ good):</strong> Gaze Attentiveness Model — BiLSTM over eye gaze features. Low value
-            indicates looking away.
-          </li>
-          <li style="margin-top:10px;">
-            <strong>UC6 Head-Gaze (↑ good):</strong> Head-Gaze Dynamics Model — detects decoupling between head pose
-            and gaze direction (e.g. phone usage).
-          </li>
-        </ul>
-      </div>
-    </div>
+      <!-- SCRIPTS -->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/javascript/javascript.min.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/python/python.min.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/edit/closebrackets.min.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/edit/matchbrackets.min.js"></script>
+      <script>
+        // --- Global State ---
+        let currentProblem = null;
+        let currentSession = null;
+        let timerInterval = null;
+        let isSubmitted = false;
+        let proctoringStream = null;
+        let proctoringInterval = null;
+        let codeEditor = null;
+        let warningActive = false;
+        let warningDismissedTime = 0;
 
-  </div>
-
-  <!-- HIDDEN BUTTON -->
-  <button id="back-button" class="hidden" onclick="goBack()"></button>
-
-  <!-- SCRIPTS -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/javascript/javascript.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/python/python.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/edit/closebrackets.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/edit/matchbrackets.min.js"></script>
-  <script>
-    // --- Global State ---
-    let currentProblem = null;
-    let currentSession = null;
-    let timerInterval = null;
-    let isSubmitted = false;
-    let proctoringStream = null;
-    let proctoringInterval = null;
-    let codeEditor = null;
-    let warningActive = false;
-    let warningDismissedTime = 0;
-
-    // --- New Warning Timer Globals ---
-    let warningTimer = null;
-    let isWarningActive = false;
-    let noFaceStartTime = null; // Track "No Face" duration
-    const WARNING_GRACE_PERIOD_MS = 2000;
+        // --- New Warning Timer Globals ---
+        let warningTimer = null;
+        let isWarningActive = false;
+        let noFaceStartTime = null; // Track "No Face" duration
+        const WARNING_GRACE_PERIOD_MS = 2000;
 
 
-    // --- Init ---
-    window.onload = function () {
-      loadProblems();
-    };
+        // --- Init ---
+        window.onload = function () {
+          loadProblems();
+        };
 
-    function toggleConsole() {
-      const p = document.getElementById('output-panel');
-      p.style.display = p.style.display === 'flex' ? 'none' : 'flex';
-    }
+        function toggleConsole() {
+          const p = document.getElementById('output-panel');
+          p.style.display = p.style.display === 'flex' ? 'none' : 'flex';
+        }
 
-    function toggleProctorMin() {
-      const w = document.getElementById('proctoring-panel');
-      const feed = document.getElementById('proctoring-feed');
-      if (feed.style.display === 'none') {
-        feed.style.display = 'block';
-        w.style.height = 'auto';
-      } else {
-        feed.style.display = 'none';
-        w.style.height = 'auto'; // collapses
-      }
-    }
+        function toggleProctorMin() {
+          const w = document.getElementById('proctoring-panel');
+          const feed = document.getElementById('proctoring-feed');
+          if (feed.style.display === 'none') {
+            feed.style.display = 'block';
+            w.style.height = 'auto';
+          } else {
+            feed.style.display = 'none';
+            w.style.height = 'auto'; // collapses
+          }
+        }
 
-    async function loadProblems() {
-      const studentId = localStorage.getItem('student_id') || '';
-      const url = studentId ? `/api/problems/?student_id=${studentId}` : '/api/problems/';
-      try {
-        const res = await fetch(url);
-        const problems = await res.json();
-        renderProblemGrid(problems);
-      } catch (e) {
-        console.error("Failed to load problems", e);
-      }
-    }
+        async function loadProblems() {
+          const studentId = localStorage.getItem('student_id') || '';
+          const url = studentId ? `/api/problems/?student_id=${studentId}` : '/api/problems/';
+          try {
+            const res = await fetch(url);
+            const problems = await res.json();
+            renderProblemGrid(problems);
+          } catch (e) {
+            console.error("Failed to load problems", e);
+          }
+        }
 
-    function renderProblemGrid(problems) {
-      const grid = document.getElementById('problems-grid');
-      grid.innerHTML = '';
+        function renderProblemGrid(problems) {
+          const grid = document.getElementById('problems-grid');
+          grid.innerHTML = '';
 
-      problems.forEach(p => {
-        const isCompleted = p.is_completed || false;
-        const card = document.createElement('div');
-        card.className = 'card';
+          problems.forEach(p => {
+            const isCompleted = p.is_completed || false;
+            const card = document.createElement('div');
+            card.className = 'card';
 
-        // Difficulty Badge mapping (mock)
-        const diffColor = p.difficulty === 'Hard' ? '#ef4444' : (p.difficulty === 'Medium' ? '#f59e0b' : '#10b981');
+            // Difficulty Badge mapping (mock)
+            const diffColor = p.difficulty === 'Hard' ? '#ef4444' : (p.difficulty === 'Medium' ? '#f59e0b' : '#10b981');
 
-        card.innerHTML = `
+            card.innerHTML = `
           <div class="flex justify-between items-center mb-2">
              <h3>${p.title}</h3>
              ${isCompleted ? '<span style="font-size:10px; background:#dcfce7; color:#166534; padding:2px 8px; border-radius:10px; font-weight:600;">COMPLETED</span>' : ''}
@@ -1132,74 +1118,74 @@
           <p>${p.description ? p.description.substring(0, 80) + '...' : 'No description available.'}</p>
           
           ${isCompleted
-            ? `<button class="btn btn-outline" disabled>Assessment Completed</button>`
-            : `<button class="btn btn-primary" onclick="startExam(${p.id})">Start Assessment</button>`
-          }
+                ? `<button class="btn btn-outline" disabled>Assessment Completed</button>`
+                : `<button class="btn btn-primary" onclick="startExam(${p.id})">Start Assessment</button>`
+              }
         `;
-        grid.appendChild(card);
-      });
-    }
+            grid.appendChild(card);
+          });
+        }
 
-    async function startExam(problemId) {
-      // Prompt ID logic
-      let studentId = localStorage.getItem('student_id');
-      if (!studentId) {
-        studentId = prompt('Enter Student ID / Name:');
-        if (!studentId) return;
-        localStorage.setItem('student_id', studentId);
-      }
+        async function startExam(problemId) {
+          // Prompt ID logic
+          let studentId = localStorage.getItem('student_id');
+          if (!studentId) {
+            studentId = prompt('Enter Student ID / Name:');
+            if (!studentId) return;
+            localStorage.setItem('student_id', studentId);
+          }
 
-      // API Call
-      try {
-        const res = await fetch(`/api/problems/${problemId}/start_exam/`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ student_id: studentId })
-        });
+          // API Call
+          try {
+            const res = await fetch(`/api/problems/${problemId}/start_exam/`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ student_id: studentId })
+            });
 
-        if (!res.ok) throw new Error("Failed to start session");
+            if (!res.ok) throw new Error("Failed to start session");
 
-        const session = await res.json();
-        currentSession = session;
-        currentProblem = session.problem;
+            const session = await res.json();
+            currentSession = session;
+            currentProblem = session.problem;
 
-        // VERIFICATION FLOW
-        await pollVerification(currentSession.session_id);
+            // VERIFICATION FLOW
+            await pollVerification(currentSession.session_id);
 
-        // Setup UI
-        setupExamUI();
-        startTimer(currentSession.time_remaining || 300);
-        startProctoring();
+            // Setup UI
+            setupExamUI();
+            startTimer(currentSession.time_remaining || 300);
+            startProctoring();
 
-      } catch (e) {
-        alert("Error starting exam: " + e.message);
-      }
-    }
+          } catch (e) {
+            alert("Error starting exam: " + e.message);
+          }
+        }
 
-    function setupExamUI() {
-      // Switch Views
-      document.getElementById('problem-list').classList.add('hidden');
-      document.getElementById('exam-section').classList.remove('hidden');
+        function setupExamUI() {
+          // Switch Views
+          document.getElementById('problem-list').classList.add('hidden');
+          document.getElementById('exam-section').classList.remove('hidden');
 
-      // Populate Data
-      document.getElementById('problem-title').innerText = currentProblem.title;
-      document.getElementById('problem-statement').innerText = currentProblem.problem_statement;
-      document.getElementById('problem-input').innerText = currentProblem.input_format || "N/A";
-      document.getElementById('problem-output').innerText = currentProblem.output_format || "N/A";
-      document.getElementById('problem-constraints').innerText = currentProblem.constraints || "N/A";
+          // Populate Data
+          document.getElementById('problem-title').innerText = currentProblem.title;
+          document.getElementById('problem-statement').innerText = currentProblem.problem_statement;
+          document.getElementById('problem-input').innerText = currentProblem.input_format || "N/A";
+          document.getElementById('problem-output').innerText = currentProblem.output_format || "N/A";
+          document.getElementById('problem-constraints').innerText = currentProblem.constraints || "N/A";
 
-      // Init Editor
-      initializeCodeEditor();
-      updateEditorForLanguage();
-    }
+          // Init Editor
+          initializeCodeEditor();
+          updateEditorForLanguage();
+        }
 
-    // --- Verification Logic ---
-    async function pollVerification(sessionId) {
-      return new Promise((resolve) => {
-        // Create Overlay
-        const overlay = document.createElement('div');
-        overlay.className = 'modal-overlay';
-        overlay.innerHTML = `
+        // --- Verification Logic ---
+        async function pollVerification(sessionId) {
+          return new Promise((resolve) => {
+            // Create Overlay
+            const overlay = document.createElement('div');
+            overlay.className = 'modal-overlay';
+            overlay.innerHTML = `
               <div class="modal">
                 <div class="modal-icon">📷</div>
                 <h2>Identity Verification</h2>
@@ -1212,557 +1198,569 @@
                 <button id="v-btn" class="btn btn-primary w-full">Capture & Verify</button>
               </div>
             `;
-        document.body.appendChild(overlay);
+            document.body.appendChild(overlay);
 
-        const video = document.getElementById('v-video');
-        const canvas = document.getElementById('v-canvas');
-        const status = document.getElementById('v-status');
-        const btn = document.getElementById('v-btn');
+            const video = document.getElementById('v-video');
+            const canvas = document.getElementById('v-canvas');
+            const status = document.getElementById('v-status');
+            const btn = document.getElementById('v-btn');
 
-        let stream = null;
+            let stream = null;
 
-        navigator.mediaDevices.getUserMedia({ video: true }).then(s => {
-          stream = s;
-          video.srcObject = stream;
-          status.innerText = "Ready to verify.";
+            navigator.mediaDevices.getUserMedia({ video: true }).then(s => {
+              stream = s;
+              video.srcObject = stream;
+              status.innerText = "Ready to verify.";
 
-          // --- Lighting Check Loop ---
-          const lightingStatus = document.createElement('div');
-          lightingStatus.id = 'v-lighting';
-          lightingStatus.style.marginTop = '10px';
-          lightingStatus.style.fontWeight = 'bold';
-          lightingStatus.style.fontSize = '0.9rem';
+              // --- Lighting Check Loop ---
+              const lightingStatus = document.createElement('div');
+              lightingStatus.id = 'v-lighting';
+              lightingStatus.style.marginTop = '10px';
+              lightingStatus.style.fontWeight = 'bold';
+              lightingStatus.style.fontSize = '0.9rem';
 
-          // Safer insertion: use the button's own parent
-          if (btn && btn.parentNode) {
-            btn.parentNode.insertBefore(lightingStatus, btn);
-          }
-
-          const checkLighting = setInterval(() => {
-            // Ensure elements exist before drawing
-            if (video && video.readyState === 4 && canvas) {
-              try {
-                const ctx = canvas.getContext('2d');
-                canvas.width = 100; // Small size for speed
-                canvas.height = 100;
-                ctx.drawImage(video, 0, 0, 100, 100);
-                const frame = ctx.getImageData(0, 0, 100, 100);
-                const data = frame.data;
-                let r, g, b, avg;
-                let colorSum = 0;
-
-                for (let x = 0, len = data.length; x < len; x += 4) {
-                  r = data[x];
-                  g = data[x + 1];
-                  b = data[x + 2];
-                  avg = Math.floor((r + g + b) / 3);
-                  colorSum += avg;
-                }
-
-                const brightness = Math.floor(colorSum / (100 * 100));
-
-                if (brightness < 60) {
-                  lightingStatus.innerText = "⚠️ Lighting is too DARK. Please add more light.";
-                  lightingStatus.style.color = "#f59e0b"; // Orange
-                } else if (brightness > 200) {
-                  lightingStatus.innerText = "⚠️ Lighting is too BRIGHT. Avoid backlighting.";
-                  lightingStatus.style.color = "#f59e0b";
-                } else {
-                  lightingStatus.innerText = "✅ Lighting conditions are GOOD.";
-                  lightingStatus.style.color = "#10b981"; // Green
-                }
-              } catch (err) {
-                // Canvas security errors or other glitches shouldn't stop the flow
-                console.warn("Lighting check failed:", err);
+              // Safer insertion: use the button's own parent
+              if (btn && btn.parentNode) {
+                btn.parentNode.insertBefore(lightingStatus, btn);
               }
-            }
-          }, 500);
 
-          // Helper to cleanup (not called automatically here, relies on verify success)
+              const checkLighting = setInterval(() => {
+                // Ensure elements exist before drawing
+                if (video && video.readyState === 4 && canvas) {
+                  try {
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = 100; // Small size for speed
+                    canvas.height = 100;
+                    ctx.drawImage(video, 0, 0, 100, 100);
+                    const frame = ctx.getImageData(0, 0, 100, 100);
+                    const data = frame.data;
+                    let r, g, b, avg;
+                    let colorSum = 0;
 
-        }).catch(e => {
-          console.error("Camera Init Error:", e);
-          status.innerText = "Error: " + (e.message || "Camera Access Denied");
-          status.style.color = "red";
-          btn.disabled = true;
-        });
+                    for (let x = 0, len = data.length; x < len; x += 4) {
+                      r = data[x];
+                      g = data[x + 1];
+                      b = data[x + 2];
+                      avg = Math.floor((r + g + b) / 3);
+                      colorSum += avg;
+                    }
 
-        btn.onclick = async () => {
-          btn.disabled = true; // Disable double clicks
-          btn.innerText = "Verifying...";
-          status.innerText = "Processing...";
-          status.style.color = "var(--primary)";
+                    const brightness = Math.floor(colorSum / (100 * 100));
 
-          // Capture
+                    if (brightness < 60) {
+                      lightingStatus.innerText = "⚠️ Lighting is too DARK. Please add more light.";
+                      lightingStatus.style.color = "#f59e0b"; // Orange
+                    } else if (brightness > 200) {
+                      lightingStatus.innerText = "⚠️ Lighting is too BRIGHT. Avoid backlighting.";
+                      lightingStatus.style.color = "#f59e0b";
+                    } else {
+                      lightingStatus.innerText = "✅ Lighting conditions are GOOD.";
+                      lightingStatus.style.color = "#10b981"; // Green
+                    }
+                  } catch (err) {
+                    // Canvas security errors or other glitches shouldn't stop the flow
+                    console.warn("Lighting check failed:", err);
+                  }
+                }
+              }, 500);
+
+              // Helper to cleanup (not called automatically here, relies on verify success)
+
+            }).catch(e => {
+              console.error("Camera Init Error:", e);
+              status.innerText = "Error: " + (e.message || "Camera Access Denied");
+              status.style.color = "red";
+              btn.disabled = true;
+            });
+
+            btn.onclick = async () => {
+              btn.disabled = true; // Disable double clicks
+              btn.innerText = "Verifying...";
+              status.innerText = "Processing...";
+              status.style.color = "var(--primary)";
+
+              // Capture
+              canvas.width = 300;
+              canvas.height = (video.videoHeight / video.videoWidth) * 300;
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+              const dataURL = canvas.toDataURL('image/jpeg', 0.85);
+
+              try {
+                // USE SERVER-SIDE USERNAME (Trusted)
+                const currentStudentId = "{{ user.username }}";
+                const r = await fetch(`/api/sessions/${sessionId}/verify_face_snapshot/`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ image: dataURL, student_id: currentStudentId })
+                });
+                const res = await r.json();
+
+                if (res.verified) {
+                  status.innerText = "Verified! Redirecting...";
+                  status.style.color = "var(--success)";
+                  setTimeout(() => {
+                    if (stream) stream.getTracks().forEach(t => t.stop());
+                    // Remove interval if exists (it sits in closure scope)
+                    // We don't have direct handle here easily unless we move 'checkLighting' up. 
+                    // But preventing memory leak:
+                    const lightingEl = document.getElementById('v-lighting');
+                    if (lightingEl) lightingEl.remove();
+
+                    document.body.removeChild(overlay);
+                    resolve(true);
+                  }, 1000);
+                } else {
+                  status.innerText = res.error ? res.error : `Match Failed (Score: ${res.similarity ? res.similarity.toFixed(2) : 0}). Try Again.`;
+                  status.style.color = "var(--danger)";
+                  btn.disabled = false;
+                  btn.innerText = "Retry";
+                }
+              } catch (e) {
+                status.innerText = "Server Error";
+                btn.disabled = false;
+                btn.innerText = "Retry";
+              }
+            };
+          });
+        }
+
+        // --- Proctoring Logic ---
+        async function startProctoring() {
+          try {
+            proctoringStream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240, facingMode: 'user' } });
+            const video = document.createElement('video');
+            video.srcObject = proctoringStream;
+            video.autoplay = true;
+            video.muted = true;
+            video.playsInline = true;
+            // Remove style width/height to let CSS control it via container
+
+            const feedContainer = document.getElementById('proctoring-feed');
+            feedContainer.innerHTML = '';
+
+            // Add Video
+            feedContainer.appendChild(video);
+
+            // Add Canvas
+            const canvas = document.createElement('canvas');
+            canvas.id = 'proctor-canvas';
+            feedContainer.appendChild(canvas);
+
+            // Analysis Loop
+            proctoringInterval = setInterval(async () => {
+              await updateProctoringStatus(video);
+            }, 200); // Faster updates (200ms) for smoother risk tracking
+
+          } catch (e) {
+            document.getElementById('proctoring-feed').innerHTML = '<div style="color:var(--danger); padding:20px; text-align:center;">Camera Error</div>';
+          }
+        }
+
+        async function updateProctoringStatus(videoEl) {
+          if (!videoEl || !currentSession) return;
+
+          // Capture frame
+          const canvas = document.createElement('canvas');
           canvas.width = 300;
-          canvas.height = (video.videoHeight / video.videoWidth) * 300;
+          canvas.height = 225;
           const ctx = canvas.getContext('2d');
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          const dataURL = canvas.toDataURL('image/jpeg', 0.85);
+          ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+          const dataURL = canvas.toDataURL('image/jpeg', 0.7);
 
           try {
-            // USE SERVER-SIDE USERNAME (Trusted)
-            const currentStudentId = "{{ user.username }}";
-            const r = await fetch(`/api/sessions/${sessionId}/verify_face_snapshot/`, {
+            const res = await fetch(`/api/sessions/${currentSession.session_id}/frame/`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ image: dataURL, student_id: currentStudentId })
+              body: JSON.stringify({ frame: dataURL })
             });
-            const res = await r.json();
+            const data = await res.json();
+            updateProctorUI(data); // Call unified updater
+          } catch (e) { }
+        }
 
-            if (res.verified) {
-              status.innerText = "Verified! Redirecting...";
-              status.style.color = "var(--success)";
-              setTimeout(() => {
-                if (stream) stream.getTracks().forEach(t => t.stop());
-                // Remove interval if exists (it sits in closure scope)
-                // We don't have direct handle here easily unless we move 'checkLighting' up. 
-                // But preventing memory leak:
-                const lightingEl = document.getElementById('v-lighting');
-                if (lightingEl) lightingEl.remove();
-
-                document.body.removeChild(overlay);
-                resolve(true);
-              }, 1000);
-            } else {
-              status.innerText = res.error ? res.error : `Match Failed (Score: ${res.similarity ? res.similarity.toFixed(2) : 0}). Try Again.`;
-              status.style.color = "var(--danger)";
-              btn.disabled = false;
-              btn.innerText = "Retry";
-            }
-          } catch (e) {
-            status.innerText = "Server Error";
-            btn.disabled = false;
-            btn.innerText = "Retry";
-          }
-        };
-      });
-    }
-
-    // --- Proctoring Logic ---
-    async function startProctoring() {
-      try {
-        proctoringStream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240, facingMode: 'user' } });
-        const video = document.createElement('video');
-        video.srcObject = proctoringStream;
-        video.autoplay = true;
-        video.muted = true;
-        video.playsInline = true;
-        // Remove style width/height to let CSS control it via container
-
-        const feedContainer = document.getElementById('proctoring-feed');
-        feedContainer.innerHTML = '';
-
-        // Add Video
-        feedContainer.appendChild(video);
-
-        // Add Canvas
-        const canvas = document.createElement('canvas');
-        canvas.id = 'proctor-canvas';
-        feedContainer.appendChild(canvas);
-
-        // Analysis Loop
-        proctoringInterval = setInterval(async () => {
-          await updateProctoringStatus(video);
-        }, 200); // Faster updates (200ms) for smoother risk tracking
-
-      } catch (e) {
-        document.getElementById('proctoring-feed').innerHTML = '<div style="color:var(--danger); padding:20px; text-align:center;">Camera Error</div>';
-      }
-    }
-
-    async function updateProctoringStatus(videoEl) {
-      if (!videoEl || !currentSession) return;
-
-      // Capture frame
-      const canvas = document.createElement('canvas');
-      canvas.width = 300;
-      canvas.height = 225;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
-      const dataURL = canvas.toDataURL('image/jpeg', 0.7);
-
-      try {
-        const res = await fetch(`/api/sessions/${currentSession.session_id}/frame/`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ frame: dataURL })
-        });
-        const data = await res.json();
-        updateProctorUI(data); // Call unified updater
-      } catch (e) { }
-    }
-
-    function updateProctorUI(data) {
-      try {
+        function updateProctorUI(data) {
+          try {
 
 
-        const dot = document.getElementById('status-dot');
-        const text = document.getElementById('proctoring-status-text');
-        const warnDiv = document.getElementById('proctoring-warnings');
+            const dot = document.getElementById('status-dot');
+            const text = document.getElementById('proctoring-status-text');
+            const warnDiv = document.getElementById('proctoring-warnings');
 
-        if (!dot || !text) return; // Basic safety
+            if (!dot || !text) return; // Basic safety
 
 
-        // Draw Bounding Boxes
-        const canvas = document.getElementById('proctor-canvas');
-        if (canvas && data.face_locations) {
-          const video = document.querySelector('#proctoring-feed video');
-          if (video) {
-            canvas.width = video.clientWidth;
-            canvas.height = video.clientHeight;
-            const ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Draw Bounding Boxes
+            const canvas = document.getElementById('proctor-canvas');
+            if (canvas && data.face_locations) {
+              const video = document.querySelector('#proctoring-feed video');
+              if (video) {
+                canvas.width = video.clientWidth;
+                canvas.height = video.clientHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Scale from capture size (approx 320x240) to display size
-            const scaleX = canvas.width / (video.videoWidth || 320);
-            const scaleY = canvas.height / (video.videoHeight || 240);
+                // Scale from capture size (approx 320x240) to display size
+                const scaleX = canvas.width / (video.videoWidth || 320);
+                const scaleY = canvas.height / (video.videoHeight || 240);
 
-            data.face_locations.forEach(box => {
-              const [top, right, bottom, left] = box;
-              const x = left * scaleX;
-              const y = top * scaleY;
-              const w = (right - left) * scaleX;
-              const h = (bottom - top) * scaleY;
+                data.face_locations.forEach(box => {
+                  const [top, right, bottom, left] = box;
+                  const x = left * scaleX;
+                  const y = top * scaleY;
+                  const w = (right - left) * scaleX;
+                  const h = (bottom - top) * scaleY;
 
-              ctx.beginPath();
-              ctx.rect(x, y, w, h);
-              ctx.lineWidth = 2;
+                  ctx.beginPath();
+                  ctx.rect(x, y, w, h);
+                  ctx.lineWidth = 2;
 
-              // Color Logic
-              if (data.num_faces > 1) {
-                ctx.strokeStyle = '#ef4444'; // Red
-                ctx.fillStyle = 'rgba(239, 68, 68, 0.2)';
-                // Label
-                ctx.font = 'bold 12px Inter';
-                ctx.fillStyle = '#ef4444';
-                ctx.fillText("UNKNOWN FACE", x, y - 5);
-              } else if (data.uc1_identity_sim < 0.4) {
-                ctx.strokeStyle = '#f59e0b'; // Orange
-                ctx.fillStyle = 'rgba(245, 158, 11, 0.2)';
-              } else {
-                ctx.strokeStyle = '#10b981'; // Green
-                ctx.fillStyle = 'rgba(16, 185, 129, 0.1)';
+                  // Color Logic
+                  if (data.num_faces > 1) {
+                    ctx.strokeStyle = '#ef4444'; // Red
+                    ctx.fillStyle = 'rgba(239, 68, 68, 0.2)';
+                    // Label
+                    ctx.font = 'bold 12px Inter';
+                    ctx.fillStyle = '#ef4444';
+                    ctx.fillText("UNKNOWN FACE", x, y - 5);
+                  } else if (data.uc1_identity_sim < 0.4) {
+                    ctx.strokeStyle = '#f59e0b'; // Orange
+                    ctx.fillStyle = 'rgba(245, 158, 11, 0.2)';
+                  } else {
+                    ctx.strokeStyle = '#10b981'; // Green
+                    ctx.fillStyle = 'rgba(16, 185, 129, 0.1)';
+                  }
+                  ctx.stroke();
+                  // ctx.fill(); // Optional fill
+                });
               }
-              ctx.stroke();
-              // ctx.fill(); // Optional fill
+            }
+
+            // ── Update ML Signal Bars ─────────────────────────────────────────
+            const setBar = (id, valId, pct) => {
+              const fill = document.getElementById(id);
+              const val = document.getElementById(valId);
+              if (fill) fill.style.width = Math.min(100, Math.max(0, pct * 100)).toFixed(1) + '%';
+              if (val) val.textContent = pct.toFixed(3);
+            };
+            const uc1 = data.uc1_identity_sim || 0;
+            const uc2 = data.uc2_instability || 0;
+            const uc3 = data.uc3_presence ?? 0.5;
+            const uc4 = data.uc4_drift || 0;
+            const risk = data.risk_score || 0;
+
+            setBar('bar-uc1', 'val-uc1', uc1);
+            setBar('bar-uc2', 'val-uc2', uc2);
+            setBar('bar-uc3', 'val-uc3', uc3);
+            setBar('bar-uc4', 'val-uc4', uc4);
+
+            // Phase 17/18 signals
+            const uc5 = data.gam_gaze ?? 0.5;
+            const uc6 = data.hgdm_prob ?? 0.5;
+            setBar('bar-uc5', 'val-uc5', uc5);
+            setBar('bar-uc6', 'val-uc6', uc6);
+
+            // Color-code UC1 bar by value
+            const uc1Fill = document.getElementById('bar-uc1');
+            if (uc1Fill) uc1Fill.style.background = uc1 < 0.5 ? '#ef4444' : uc1 < 0.65 ? '#f59e0b' : '#4f46e5';
+
+            // UC5 risk sparkline (rolling 20-point buffer, max risk values)
+            if (!window._riskHistory) window._riskHistory = [];
+            window._riskHistory.push(risk);
+            if (window._riskHistory.length > 20) window._riskHistory.shift();
+
+            const W = 272, H = 32;
+            const pts = window._riskHistory;
+            const step = W / Math.max(pts.length - 1, 1);
+            const polyEl = document.getElementById('sparkline-line');
+            if (polyEl && pts.length > 1) {
+              const points = pts.map((v, i) => `${(i * step).toFixed(1)},${(H - v * H).toFixed(1)}`).join(' ');
+              polyEl.setAttribute('points', points);
+              polyEl.setAttribute('stroke', risk > 0.7 ? '#ef4444' : risk > 0.3 ? '#f59e0b' : '#4f46e5');
+            }
+
+            // Risk badge and Uncertainty
+            const badge = document.getElementById('risk-badge');
+            const riskValEl = document.getElementById('risk-val');
+            const uncertValEl = document.getElementById('uncert-val');
+            const uncertBadgeEl = document.getElementById('uncert-badge');
+
+            const uncertainty = data.uncertainty || 0;
+
+            if (badge) {
+              badge.className = 'risk-badge ' + (risk > 0.7 ? 'high' : risk > 0.3 ? 'medium' : 'low');
+              badge.textContent = risk > 0.7 ? 'HIGH' : risk > 0.3 ? 'MED' : 'LOW';
+            }
+            if (riskValEl) riskValEl.textContent = risk.toFixed(4);
+
+            // Update uncertainty badge
+            if (uncertValEl) uncertValEl.textContent = uncertainty.toFixed(3);
+            if (uncertBadgeEl) {
+              uncertBadgeEl.style.background = uncertainty > 0.5 ? '#fef08a' : '#e2e8f0'; // turn yellow if high uncertainty
+              uncertBadgeEl.style.color = uncertainty > 0.5 ? '#854d0e' : '#475569';
+            }
+            // ─────────────────────────────────────────────────────────────────
+
+            // --- WARNING POPUP LOGIC (STRICT) ---
+
+            const warningOverlay = document.getElementById('risk-warning-overlay');
+            const warningMessageEl = document.getElementById('warning-reason');
+
+            let shouldWarn = false;
+            let msg = "";
+
+            // Condition 1: No Face (With Grace Period)
+            if (data.num_faces === 0) {
+              // Start timer if not started
+              if (!noFaceStartTime) {
+                noFaceStartTime = Date.now();
+              }
+              // Only warn if 3 seconds have passed
+              else if (Date.now() - noFaceStartTime > 3000) {
+                shouldWarn = true;
+                msg = "No Face Detected.<br>Please ensure your face is clearly visible in the camera frame.";
+              }
+            }
+            else {
+              // Reset timer immediately if face found
+              noFaceStartTime = null;
+
+              // Condition 2: Multiple Faces
+              if (data.num_faces > 1) {
+                shouldWarn = true;
+                msg = "Multiple Faces Detected.<br>Only one person is allowed during the exam.";
+              }
+              // Condition 3: Identity Mismatch (UC1) - STRICT CHECK
+              else if (data.uc1_identity_sim < 0.50) {
+                shouldWarn = true;
+                msg = `Identity Verification Failed.<br>Face does not match the session profile.`;
+              }
+              // Condition 4: High Risk (UC5)
+              else if (data.risk_score >= 0.75) {
+                shouldWarn = true;
+                msg = "High Suspicious Activity Detected.<br>Please focus on the screen.";
+              }
+            }
+
+            if (shouldWarn) {
+              // Only update if the message has changed to prevent flickering
+              if (warningMessageEl.innerHTML !== msg) {
+                warningMessageEl.innerHTML = msg;
+              }
+              // Only touch display if not already visible
+              if (warningOverlay.style.display !== 'flex') {
+                warningOverlay.style.display = 'flex';
+              }
+              isWarningActive = true;
+            } else {
+              // Clear Warning
+              if (warningOverlay.style.display !== 'none') {
+                warningOverlay.style.display = 'none';
+              }
+              isWarningActive = false;
+            }
+            // ---------------------------
+
+            // Visual Status
+            if (data.num_faces === 1) {
+              dot.className = 'status-dot'; // green
+              // Use backend text (ID | S | R) directly
+              if (data.head_pose && data.head_pose.includes('|')) {
+                text.innerText = data.head_pose;
+              } else {
+                text.innerText = `Monitoring (${Math.round((data.face_confidence || 1) * 100)}%)`;
+              }
+              text.style.color = 'var(--text-main)';
+            } else {
+              dot.className = 'status-dot danger';
+              text.innerText = data.num_faces === 0 ? "No Face Detected" : "Multiple Faces";
+              text.style.color = 'var(--danger)';
+            }
+
+            // Warnings List
+            let warns = [];
+            // Only show head pose in warnings if it's NOT the standard metrics string (i.e. if it's "Identity Mismatch" etc)
+            // Standard metrics string contains '|'
+
+            if (data.head_pose && !data.head_pose.includes('|') && !data.head_pose.includes('Center') && !data.head_pose.includes('Monitoring')) {
+              warns.push(data.head_pose);
+            }
+            if (data.left_eye_dir && data.left_eye_dir !== 'Center') warns.push("Eye: " + data.left_eye_dir);
+
+            if (warnDiv) {
+              warnDiv.innerHTML = warns.length > 0 ? warns.join(', ') : 'No anomalies detected';
+            }
+
+          } catch (err) {
+            console.error("ProctorUI Error:", err);
+            // Optional: Display error in status text for debugging
+            const text = document.getElementById('proctoring-status-text');
+            if (text) text.innerText = "Error: " + err.message;
+          }
+        }
+
+        // --- Risk & Warning Logic (Preserved) ---
+        // The previous checkRiskAndWarn and related functions are now replaced by the new logic in updateProctorUI
+        // function checkRiskAndWarn(data) {
+        //   if (Date.now() - warningDismissedTime < 10000) return;
+
+        //   const riskScore = data.risk_score || 0;
+        //   const simScore = data.uc1_identity_sim || 1.0;
+        //   let reason = "";
+
+        //   if (simScore < 0.3) {
+        //     reason = "Identity Verification Failed.<br>Face does not match profile.";
+        //   } else if (data.num_faces === 0) {
+        //     reason = "No Face Detected.<br>Please return to the frame immediately.";
+        //   } else if (data.num_faces > 1) {
+        //     reason = "Multiple Faces Detected.<br>Only one person is allowed.";
+        //   } else if (riskScore > 0.75) {
+        //     reason = "High Suspicious Activity.<br>Please maintain eye contact with the screen.";
+        //   }
+
+        //   if (reason) {
+        //     showWarningPopup(reason);
+        //   }
+        // }
+
+        function showWarningPopup(msg) {
+          // This function is now largely superseded by the new debounce logic
+          // but kept for potential other uses or if the new logic needs to call it.
+          if (isWarningActive) return; // Use new global state
+          const overlay = document.getElementById('risk-warning-overlay');
+          document.getElementById('warning-reason').innerHTML = msg;
+          overlay.style.display = 'flex';
+          isWarningActive = true; // Update new global state
+        }
+
+        function dismissWarning() {
+          document.getElementById('risk-warning-overlay').style.display = 'none';
+          isWarningActive = false; // Update new global state
+          warningDismissedTime = Date.now(); // This can still be useful for a cooldown
+          if (warningTimer) { // Also clear any pending timer if dismissed manually
+            clearTimeout(warningTimer);
+            warningTimer = null;
+          }
+        }
+
+        function toggleProctorHelp() {
+          const el = document.getElementById('proctor-help-overlay');
+          el.style.display = el.style.display === 'none' ? 'flex' : 'none';
+        }
+
+        // --- Editor & Submission ---
+        function initializeCodeEditor() {
+          if (codeEditor) return;
+          codeEditor = CodeMirror(document.getElementById('editor-container'), {
+            value: "",
+            mode: "javascript",
+            theme: "dracula",
+            lineNumbers: true,
+            indentUnit: 4,
+            autoCloseBrackets: true,
+            matchBrackets: true
+          });
+          codeEditor.on('change', cm => document.getElementById('editor').value = cm.getValue());
+        }
+
+        function changeLanguage() {
+          updateEditorForLanguage();
+        }
+
+        function updateEditorForLanguage() {
+          const lang = document.getElementById('language').value;
+          if (!codeEditor) initializeCodeEditor();
+          codeEditor.setOption('mode', lang === 'python' ? 'python' : 'javascript');
+
+          // Defaults
+          let defaultCode = "";
+          if (currentProblem && currentProblem.language_specific_code) {
+            defaultCode = currentProblem.language_specific_code[lang] || "";
+          }
+          if (!defaultCode) defaultCode = lang === 'python' ? "def solve(*args):\n    return None" : "function solve(...args) {\n  return null;\n}";
+
+          codeEditor.setValue(defaultCode);
+        }
+
+        async function runCode() {
+          const code = codeEditor.getValue();
+          const lang = document.getElementById('language').value;
+          const payload = { code, language: lang, test_cases: currentProblem.test_cases };
+
+          // Toggle Console Open
+          const consolePanel = document.getElementById('output-panel');
+          if (consolePanel.style.display !== 'flex') {
+            consolePanel.style.display = 'flex';
+          }
+          document.getElementById('output').innerText = "Running...";
+
+          try {
+            const res = await fetch('/api/execute/', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
             });
+            const out = await res.json();
+
+            // Render Results
+            let outputHtml = "";
+            let passCount = 0;
+            if (out.results) {
+              out.results.forEach((r, i) => {
+                const status = r.passed ? "✅ Passed" : "❌ Failed";
+                if (r.passed) passCount++;
+                outputHtml += `[Test ${i + 1}] ${status}\nInput: ${JSON.stringify(r.input)}\nGot: ${JSON.stringify(r.actual)}\n\n`;
+              });
+              outputHtml += `Summary: ${passCount}/${out.results.length} Passed`;
+            } else {
+              outputHtml = "No output returned.";
+            }
+            document.getElementById('output').innerText = outputHtml;
+
+          } catch (e) {
+            document.getElementById('output').innerText = "Error: " + e.message;
           }
         }
 
-        // ── Update ML Signal Bars ─────────────────────────────────────────
-        const setBar = (id, valId, pct) => {
-          const fill = document.getElementById(id);
-          const val = document.getElementById(valId);
-          if (fill) fill.style.width = Math.min(100, Math.max(0, pct * 100)).toFixed(1) + '%';
-          if (val) val.textContent = pct.toFixed(3);
-        };
-        const uc1 = data.uc1_identity_sim || 0;
-        const uc2 = data.uc2_instability || 0;
-        const uc3 = data.uc3_presence ?? 0.5;
-        const uc4 = data.uc4_drift || 0;
-        const risk = data.risk_score || 0;
-
-        setBar('bar-uc1', 'val-uc1', uc1);
-        setBar('bar-uc2', 'val-uc2', uc2);
-        setBar('bar-uc3', 'val-uc3', uc3);
-        setBar('bar-uc4', 'val-uc4', uc4);
-
-        // Phase 17/18 signals
-        const uc5 = data.gam_gaze ?? 0.5;
-        const uc6 = data.hgdm_prob ?? 0.5;
-        setBar('bar-uc5', 'val-uc5', uc5);
-        setBar('bar-uc6', 'val-uc6', uc6);
-
-        // Color-code UC1 bar by value
-        const uc1Fill = document.getElementById('bar-uc1');
-        if (uc1Fill) uc1Fill.style.background = uc1 < 0.5 ? '#ef4444' : uc1 < 0.65 ? '#f59e0b' : '#4f46e5';
-
-        // UC5 risk sparkline (rolling 20-point buffer, max risk values)
-        if (!window._riskHistory) window._riskHistory = [];
-        window._riskHistory.push(risk);
-        if (window._riskHistory.length > 20) window._riskHistory.shift();
-
-        const W = 272, H = 32;
-        const pts = window._riskHistory;
-        const step = W / Math.max(pts.length - 1, 1);
-        const polyEl = document.getElementById('sparkline-line');
-        if (polyEl && pts.length > 1) {
-          const points = pts.map((v, i) => `${(i * step).toFixed(1)},${(H - v * H).toFixed(1)}`).join(' ');
-          polyEl.setAttribute('points', points);
-          polyEl.setAttribute('stroke', risk > 0.7 ? '#ef4444' : risk > 0.3 ? '#f59e0b' : '#4f46e5');
-        }
-
-        // Risk badge
-        const badge = document.getElementById('risk-badge');
-        const riskValEl = document.getElementById('risk-val');
-        if (badge) {
-          badge.className = 'risk-badge ' + (risk > 0.7 ? 'high' : risk > 0.3 ? 'medium' : 'low');
-          badge.textContent = risk > 0.7 ? 'HIGH' : risk > 0.3 ? 'MED' : 'LOW';
-        }
-        if (riskValEl) riskValEl.textContent = risk.toFixed(4);
-        // ─────────────────────────────────────────────────────────────────
-
-        // --- WARNING POPUP LOGIC (STRICT) ---
-
-        const warningOverlay = document.getElementById('risk-warning-overlay');
-        const warningMessageEl = document.getElementById('warning-reason');
-
-        let shouldWarn = false;
-        let msg = "";
-
-        // Condition 1: No Face (With Grace Period)
-        if (data.num_faces === 0) {
-          // Start timer if not started
-          if (!noFaceStartTime) {
-            noFaceStartTime = Date.now();
-          }
-          // Only warn if 3 seconds have passed
-          else if (Date.now() - noFaceStartTime > 3000) {
-            shouldWarn = true;
-            msg = "No Face Detected.<br>Please ensure your face is clearly visible in the camera frame.";
-          }
-        }
-        else {
-          // Reset timer immediately if face found
-          noFaceStartTime = null;
-
-          // Condition 2: Multiple Faces
-          if (data.num_faces > 1) {
-            shouldWarn = true;
-            msg = "Multiple Faces Detected.<br>Only one person is allowed during the exam.";
-          }
-          // Condition 3: Identity Mismatch (UC1) - STRICT CHECK
-          else if (data.uc1_identity_sim < 0.50) {
-            shouldWarn = true;
-            msg = `Identity Verification Failed.<br>Face does not match the session profile.`;
-          }
-          // Condition 4: High Risk (UC5)
-          else if (data.risk_score >= 0.75) {
-            shouldWarn = true;
-            msg = "High Suspicious Activity Detected.<br>Please focus on the screen.";
+        async function submitCode() {
+          if (confirm("Submit solution?")) {
+            const code = codeEditor.getValue();
+            const lang = document.getElementById('language').value;
+            try {
+              const res = await fetch(`/api/sessions/${currentSession.session_id}/submit/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code, language: lang, student_id: localStorage.getItem('student_id') })
+              });
+              const out = await res.json();
+              alert(`Submission Complete. Score: ${out.score}/${out.max_score}`);
+              location.reload();
+            } catch (e) {
+              alert("Submission failed");
+            }
           }
         }
 
-        if (shouldWarn) {
-          // Only update if the message has changed to prevent flickering
-          if (warningMessageEl.innerHTML !== msg) {
-            warningMessageEl.innerHTML = msg;
-          }
-          // Only touch display if not already visible
-          if (warningOverlay.style.display !== 'flex') {
-            warningOverlay.style.display = 'flex';
-          }
-          isWarningActive = true;
-        } else {
-          // Clear Warning
-          if (warningOverlay.style.display !== 'none') {
-            warningOverlay.style.display = 'none';
-          }
-          isWarningActive = false;
-        }
-        // ---------------------------
-
-        // Visual Status
-        if (data.num_faces === 1) {
-          dot.className = 'status-dot'; // green
-          // Use backend text (ID | S | R) directly
-          if (data.head_pose && data.head_pose.includes('|')) {
-            text.innerText = data.head_pose;
-          } else {
-            text.innerText = `Monitoring (${Math.round((data.face_confidence || 1) * 100)}%)`;
-          }
-          text.style.color = 'var(--text-main)';
-        } else {
-          dot.className = 'status-dot danger';
-          text.innerText = data.num_faces === 0 ? "No Face Detected" : "Multiple Faces";
-          text.style.color = 'var(--danger)';
-        }
-
-        // Warnings List
-        let warns = [];
-        // Only show head pose in warnings if it's NOT the standard metrics string (i.e. if it's "Identity Mismatch" etc)
-        // Standard metrics string contains '|'
-
-        if (data.head_pose && !data.head_pose.includes('|') && !data.head_pose.includes('Center') && !data.head_pose.includes('Monitoring')) {
-          warns.push(data.head_pose);
-        }
-        if (data.left_eye_dir && data.left_eye_dir !== 'Center') warns.push("Eye: " + data.left_eye_dir);
-
-        if (warnDiv) {
-          warnDiv.innerHTML = warns.length > 0 ? warns.join(', ') : 'No anomalies detected';
-        }
-
-      } catch (err) {
-        console.error("ProctorUI Error:", err);
-        // Optional: Display error in status text for debugging
-        const text = document.getElementById('proctoring-status-text');
-        if (text) text.innerText = "Error: " + err.message;
-      }
-    }
-
-    // --- Risk & Warning Logic (Preserved) ---
-    // The previous checkRiskAndWarn and related functions are now replaced by the new logic in updateProctorUI
-    // function checkRiskAndWarn(data) {
-    //   if (Date.now() - warningDismissedTime < 10000) return;
-
-    //   const riskScore = data.risk_score || 0;
-    //   const simScore = data.uc1_identity_sim || 1.0;
-    //   let reason = "";
-
-    //   if (simScore < 0.3) {
-    //     reason = "Identity Verification Failed.<br>Face does not match profile.";
-    //   } else if (data.num_faces === 0) {
-    //     reason = "No Face Detected.<br>Please return to the frame immediately.";
-    //   } else if (data.num_faces > 1) {
-    //     reason = "Multiple Faces Detected.<br>Only one person is allowed.";
-    //   } else if (riskScore > 0.75) {
-    //     reason = "High Suspicious Activity.<br>Please maintain eye contact with the screen.";
-    //   }
-
-    //   if (reason) {
-    //     showWarningPopup(reason);
-    //   }
-    // }
-
-    function showWarningPopup(msg) {
-      // This function is now largely superseded by the new debounce logic
-      // but kept for potential other uses or if the new logic needs to call it.
-      if (isWarningActive) return; // Use new global state
-      const overlay = document.getElementById('risk-warning-overlay');
-      document.getElementById('warning-reason').innerHTML = msg;
-      overlay.style.display = 'flex';
-      isWarningActive = true; // Update new global state
-    }
-
-    function dismissWarning() {
-      document.getElementById('risk-warning-overlay').style.display = 'none';
-      isWarningActive = false; // Update new global state
-      warningDismissedTime = Date.now(); // This can still be useful for a cooldown
-      if (warningTimer) { // Also clear any pending timer if dismissed manually
-        clearTimeout(warningTimer);
-        warningTimer = null;
-      }
-    }
-
-    function toggleProctorHelp() {
-      const el = document.getElementById('proctor-help-overlay');
-      el.style.display = el.style.display === 'none' ? 'flex' : 'none';
-    }
-
-    // --- Editor & Submission ---
-    function initializeCodeEditor() {
-      if (codeEditor) return;
-      codeEditor = CodeMirror(document.getElementById('editor-container'), {
-        value: "",
-        mode: "javascript",
-        theme: "dracula",
-        lineNumbers: true,
-        indentUnit: 4,
-        autoCloseBrackets: true,
-        matchBrackets: true
-      });
-      codeEditor.on('change', cm => document.getElementById('editor').value = cm.getValue());
-    }
-
-    function changeLanguage() {
-      updateEditorForLanguage();
-    }
-
-    function updateEditorForLanguage() {
-      const lang = document.getElementById('language').value;
-      if (!codeEditor) initializeCodeEditor();
-      codeEditor.setOption('mode', lang === 'python' ? 'python' : 'javascript');
-
-      // Defaults
-      let defaultCode = "";
-      if (currentProblem && currentProblem.language_specific_code) {
-        defaultCode = currentProblem.language_specific_code[lang] || "";
-      }
-      if (!defaultCode) defaultCode = lang === 'python' ? "def solve(*args):\n    return None" : "function solve(...args) {\n  return null;\n}";
-
-      codeEditor.setValue(defaultCode);
-    }
-
-    async function runCode() {
-      const code = codeEditor.getValue();
-      const lang = document.getElementById('language').value;
-      const payload = { code, language: lang, test_cases: currentProblem.test_cases };
-
-      // Toggle Console Open
-      const consolePanel = document.getElementById('output-panel');
-      if (consolePanel.style.display !== 'flex') {
-        consolePanel.style.display = 'flex';
-      }
-      document.getElementById('output').innerText = "Running...";
-
-      try {
-        const res = await fetch('/api/execute/', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        const out = await res.json();
-
-        // Render Results
-        let outputHtml = "";
-        let passCount = 0;
-        if (out.results) {
-          out.results.forEach((r, i) => {
-            const status = r.passed ? "✅ Passed" : "❌ Failed";
-            if (r.passed) passCount++;
-            outputHtml += `[Test ${i + 1}] ${status}\nInput: ${JSON.stringify(r.input)}\nGot: ${JSON.stringify(r.actual)}\n\n`;
-          });
-          outputHtml += `Summary: ${passCount}/${out.results.length} Passed`;
-        } else {
-          outputHtml = "No output returned.";
-        }
-        document.getElementById('output').innerText = outputHtml;
-
-      } catch (e) {
-        document.getElementById('output').innerText = "Error: " + e.message;
-      }
-    }
-
-    async function submitCode() {
-      if (confirm("Submit solution?")) {
-        const code = codeEditor.getValue();
-        const lang = document.getElementById('language').value;
-        try {
-          const res = await fetch(`/api/sessions/${currentSession.session_id}/submit/`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code, language: lang, student_id: localStorage.getItem('student_id') })
-          });
-          const out = await res.json();
-          alert(`Submission Complete. Score: ${out.score}/${out.max_score}`);
-          location.reload();
-        } catch (e) {
-          alert("Submission failed");
-        }
-      }
-    }
-
-    function startTimer(seconds) {
-      clearInterval(timerInterval);
-      const display = document.getElementById('timer');
-      timerInterval = setInterval(() => {
-        seconds--;
-        const m = Math.floor(seconds / 60);
-        const s = seconds % 60;
-        display.innerText = `${m}:${s.toString().padStart(2, '0')}`;
-        if (seconds <= 0) {
+        function startTimer(seconds) {
           clearInterval(timerInterval);
-          alert("Time up!");
-          submitCode();
+          const display = document.getElementById('timer');
+          timerInterval = setInterval(() => {
+            seconds--;
+            const m = Math.floor(seconds / 60);
+            const s = seconds % 60;
+            display.innerText = `${m}:${s.toString().padStart(2, '0')}`;
+            if (seconds <= 0) {
+              clearInterval(timerInterval);
+              alert("Time up!");
+              submitCode();
+            }
+          }, 1000);
         }
-      }, 1000);
-    }
 
-    function goBack() {
-      if (confirm("Exit exam? Progress will be lost.")) location.reload();
-    }
-  </script>
+        function goBack() {
+          if (confirm("Exit exam? Progress will be lost.")) location.reload();
+        }
+      </script>
 </body>
 
 </html>

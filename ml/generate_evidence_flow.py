@@ -73,7 +73,7 @@ def generate_evidence_flow_diagram():
             fontsize=18, fontweight='bold', color='#BF360C')
     ax.text(0.695, 0.43, 'Risk Fusion\nEngine', ha='center', va='center',
             fontsize=11, color='#E65100')
-    ax.text(0.695, 0.32, r'$\rho_t = \sigma(W h_t)$', ha='center', va='center',
+    ax.text(0.695, 0.32, r'$[\mu_t, \log \sigma_t^2]$', ha='center', va='center',
             fontsize=9, color='#8D6E63', style='italic')
     
     # ═══ BIG ARROW 3 ═══
@@ -98,22 +98,33 @@ def generate_evidence_flow_diagram():
     # Genuine: stays flat near 0
     risk_gen = 0.02 + 0.015 * np.sin(0.1 * t) + 0.01 * np.random.randn(200)
     risk_gen = np.clip(risk_gen, 0, 0.12)
+    unc_gen = 0.03 + 0.005 * np.random.randn(200)
     
     # Cheating: smooth sigmoid rise
     sigmoid = 1.0 / (1.0 + np.exp(-0.12 * (t - 55)))
     risk_cheat = sigmoid + 0.02 * np.random.randn(200)
     risk_cheat = np.clip(risk_cheat, 0, 1)
+    # Uncertainty spikes around t=55 (the transition/ambiguous phase)
+    unc_cheat = 0.05 + 0.25 * np.exp(-((t - 55)**2) / 100) + 0.01 * np.random.randn(200)
+    unc_cheat = np.clip(unc_cheat, 0.01, 0.4)
     
-    ax_traj.fill_between(t, risk_cheat, alpha=0.10, color='#E53935')
-    ax_traj.plot(t, risk_cheat, color='#E53935', lw=2.5, label='Cheating Session')
-    ax_traj.plot(t, risk_gen, color='#2E7D32', lw=2.5, label='Genuine Session')
+    ax_traj.fill_between(t, np.clip(risk_cheat - unc_cheat, 0, 1), np.clip(risk_cheat + unc_cheat, 0, 1), alpha=0.25, color='#E53935')
+    ax_traj.plot(t, risk_cheat, color='#E53935', lw=2.5, label='Cheating Risk $\\rho_t$')
+    
+    ax_traj.fill_between(t, np.clip(risk_gen - unc_gen, 0, 1), np.clip(risk_gen + unc_gen, 0, 1), alpha=0.25, color='#2E7D32')
+    ax_traj.plot(t, risk_gen, color='#2E7D32', lw=2.5, label=r'Genuine Risk $\rho_t$')
+    
+    # We add a proxy artist to legend for Uncertainty
+    unc_patch = mpatches.Patch(color='gray', alpha=0.3, label=r'Uncertainty $\pm\sigma_t$')
     
     ax_traj.set_xlabel('Frame (t)', fontsize=10)
     ax_traj.set_ylabel(r'$\rho_t$', fontsize=12)
     ax_traj.set_ylim(-0.05, 1.1)
     ax_traj.set_xlim(0, 120)
     ax_traj.set_yticks([0, 0.5, 1.0])
-    ax_traj.legend(fontsize=9, loc='center left', framealpha=0.9)
+    handles, labels = ax_traj.get_legend_handles_labels()
+    handles.append(unc_patch)
+    ax_traj.legend(handles=handles, fontsize=9, loc='center left', framealpha=0.9)
     ax_traj.spines['top'].set_visible(False)
     ax_traj.spines['right'].set_visible(False)
     ax_traj.set_title('Accumulated Risk Trajectory', fontsize=10, color='#616161')
