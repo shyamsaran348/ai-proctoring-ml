@@ -94,7 +94,8 @@ Every incoming live frame $I_t$ is first pushed through the generic IDE to yield
 * **Architecture:** LSTM (Hidden Dimension = 32)
 * **Input:** $S_t$ (Cosine similarity between $e_t$ and $e_0$)
 * **Target Behavior:** Detects rapid, erratic flickering in identity similarity. This typically occurs during physical impersonation hand-offs (e.g., someone leaning into the frame) or camera proxy attacks jumping between two video feeds. 
-* **Output:** $I_t \in [0,1]$
+* **Objective:** Detect sudden impersonation or flickering substitutions.
+* **Output:** $U_t \in [0,1]$
 
 #### UC3: Presence and Attentiveness Model (PAM)
 * **Architecture:** Bi-Directional LSTM (Hidden Dimension = 64)
@@ -122,7 +123,7 @@ Every incoming live frame $I_t$ is first pushed through the generic IDE to yield
 
 ### Stage 3: Risk Fusion Engine (RFE / UC5)
 * **Architecture:** Gated Recurrent Unit (GRU) (Hidden Dimension = 32)
-* **Input:** The 6 scalar outputs of the temporal experts concatenated into a single risk vector $\mathbf{r}_t = [S_t,\, I_t,\, P_t,\, D_t,\, G_t,\, H_t]^\top \in \mathbb{R}^6$.
+* **Input:** The 6 scalar outputs of the temporal experts concatenated into a single risk vector $\mathbf{r}_t = [S_t,\, U_t,\, P_t,\, D_t,\, G_t,\, H_t]^\top \in \mathbb{R}^6$.
 * **Mechanism:** The GRU maintains a hidden state $h_t$ that carries the entirety of the session's behavioral history. As new $\mathbf{r}_t$ vectors arrive, the GRU updates its internal memory gates to determine how much new evidence is synthesized into the total probability.
 * **Output:** $\rho_t \in [0,1]$ — The final, continuous, and highly calibrated probability that the exam session is currently compromised.
 
@@ -153,7 +154,7 @@ $$ h_t = (1 - z_t) \odot h_{t-1} + z_t \odot \tilde{h}_t \quad \text{(New State)
 ### 5.4 Uncertainty-Aware Gaussian Projection (Phase 19 Innovation)
 A critical flaw in historical binary classification systems is their inability to distinguish between "strong evidence of cheating" and "noisy sensor reading causing the model to guess." We overcome this via explicitly modeling both **Aleatoric** (data noise) and **Epistemic** (model ignorance) uncertainty.
 
-Instead of predicting a single point estimate (scalar risk), the RFE projects the multidimensional hidden state into a two-parameter Gaussian distribution $\mathcal{N}(\mu_t, \sigma_t^2)$. This is parameterized by a fully connected layer:
+Instead of predicting a single point estimate (scalar risk), the RFE predicts a Gaussian distribution over the risk logit, parameterized by mean $\mu_t$ and log-variance $\log \sigma_t^2$, by projecting the multidimensional hidden state through a fully connected layer:
 $$ [\mu_t, \log \sigma_t^2]^\top = W_o h_t + b_o $$
 
 From this projection, we isolate two distinct behavioral parameters:

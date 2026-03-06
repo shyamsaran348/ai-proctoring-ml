@@ -28,7 +28,7 @@ shyamsaran348@gmail.com}
 \maketitle
 
 \begin{abstract}
-We propose a shift in automated online proctoring from instantaneous rule-based event detection to multi-signal temporal behavioral inference. Our framework integrates seven neural components: a one-shot identity embedder (IDE), an identity instability monitor (IIM), a presence and attentiveness model (PAM), a long-horizon drift detector (LDD), a gaze attentiveness model (GAM), a head-gaze dynamics model (HGDM), and a GRU-based risk fusion engine (RFE). Unlike traditional systems that flag isolated threshold violations, our approach treats individual behavioral markers as weak signals whose diagnostic power emerges through temporal evidence accumulation. Each component produces a continuous signal ($S_t, I_t, P_t, D_t, G_t, H_t$) that is fused into a session-level Gaussian risk trajectory $\mathcal{N}(\mu_t, \sigma_t^2)$, yielding both a risk probability $\rho_t$ and an explicit prediction confidence $\sigma_t$. Evaluation on 5{,}000 synthetic sessions demonstrates that temporal accumulation achieves high-confidence session verdicts (ROC-AUC 0.9992) from individually low-confidence frame-level markers (ROC-AUC 0.64--0.94). The integration of continuous uncertainty explicitly prevents automated false positive accusations caused by instantaneous noise.
+We propose a shift in automated online proctoring from instantaneous rule-based event detection to multi-signal temporal behavioral inference. Our framework integrates seven neural components: a one-shot identity embedder (IDE), an identity instability monitor (IIM), a presence and attentiveness model (PAM), a long-horizon drift detector (LDD), a gaze attentiveness model (GAM), a head-gaze dynamics model (HGDM), and a GRU-based risk fusion engine (RFE). Unlike traditional systems that flag isolated threshold violations, our approach treats individual behavioral markers as weak signals whose diagnostic power emerges through temporal evidence accumulation. Each component produces a continuous signal ($S_t, U_t, P_t, D_t, G_t, H_t$) that is fused by predicting a Gaussian distribution over the risk logit, parameterized by mean $\mu_t$ and variance $\sigma_t^2$, yielding both a risk probability $\rho_t$ and an explicit prediction confidence $\sigma_t$. Evaluation on 5{,}000 synthetic sessions demonstrates that temporal accumulation achieves high-confidence session verdicts (ROC-AUC 0.9992) from individually low-confidence frame-level markers (ROC-AUC 0.64--0.94). The integration of continuous uncertainty explicitly prevents automated false positive accusations caused by instantaneous noise.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -75,7 +75,7 @@ The proposed system operates through a cascaded temporal architecture comprising
 
 \begin{figure}[!t]
 \centerline{\includegraphics[width=\columnwidth]{evidence_flow.png}}
-\caption{Temporal evidence flow. Six raw behavioral signals ($S_t, I_t, P_t, D_t, G_t, H_t$), each individually noisy and weak, are processed by specialized temporal experts (IIM, PAM, LDD, GAM, HGDM) and fused by a GRU-based Risk Fusion Engine (RFE) into a smooth session-level risk trajectory $\rho_t$.}
+\caption{Temporal evidence flow. Six raw behavioral signals ($S_t, U_t, P_t, D_t, G_t, H_t$), each individually noisy and weak, are processed by specialized temporal experts (IIM, PAM, LDD, GAM, HGDM) and fused by a GRU-based Risk Fusion Engine (RFE) into a smooth session-level risk trajectory $\rho_t$.}
 \label{fig:flow}
 \end{figure}
 
@@ -87,7 +87,7 @@ As live monitoring begins, the per-frame pipeline extracts a probe embedding $e_
 
 Each feature stream is processed by a specialized temporal expert:
 \begin{itemize}
-    \item \textbf{IIM} (LSTM): processes the similarity sequence $\{S_t\}$ to produce an instability signal $I_t$.
+    \item \textbf{IIM} (LSTM): processes the similarity sequence $\{S_t\}$ to produce an instability signal $U_t$.
     \item \textbf{PAM} (Bi-LSTM): processes 6D presence features to produce $P_t$.
     \item \textbf{LDD} (Bi-LSTM, 120-frame buffer): analyzes the displacement trajectory $\{\delta_t\}$ to produce a drift signal $D_t$.
     \item \textbf{GAM} (Bi-LSTM, 120-frame buffer): processes 6D gaze features to produce a gaze attentiveness signal $G_t$.
@@ -105,11 +105,11 @@ Rather than extreme point estimation, the system projects the hidden state into 
 
 \begin{figure}[!t]
 \centerline{\includegraphics[width=\columnwidth]{workflow.png}}
-\caption{System workflow. Enrollment: IDE produces the immutable embedding $e_0$. Live Monitoring: per-frame pipeline produces signals $I_t, P_t, D_t, G_t, H_t$ from IIM, PAM, LDD, GAM, and HGDM respectively, fused by RFE. Session End: final risk $\rho_t$ forwarded for human review.}
+\caption{System workflow. Enrollment: IDE produces the immutable embedding $e_0$. Live Monitoring: per-frame pipeline produces signals $U_t, P_t, D_t, G_t, H_t$ from IIM, PAM, LDD, GAM, and HGDM respectively, fused by RFE. Session End: final risk $\rho_t$ forwarded for human review.}
 \label{fig:workflow}
 \end{figure}
 
-The overarching architecture is illustrated in Figure~\ref{fig:arch}. All six signal streams ($S_t, I_t, P_t, D_t, G_t, H_t$) converge into the RFE, which integrates evidence over the full session timescale. Table~\ref{tab:summary} summarizes each component's operating horizon. The design enforces four invariants: (i)~immutability of the enrollment embedding, (ii)~total absence of hard thresholds at component boundaries, (iii)~non-exclusionary signal aggregation, and (iv)~session-level supervision. These constraints ensure the model learns to synthesize behavioral intent from temporal sequences rather than reacting to isolated noisy frames.
+The overarching architecture is illustrated in Figure~\ref{fig:arch}. All six signal streams ($S_t, U_t, P_t, D_t, G_t, H_t$) converge into the RFE, which integrates evidence over the full session timescale. Table~\ref{tab:summary} summarizes each component's operating horizon. The design enforces four invariants: (i)~immutability of the enrollment embedding, (ii)~total absence of hard thresholds at component boundaries, (iii)~non-exclusionary signal aggregation, and (iv)~session-level supervision. These constraints ensure the model learns to synthesize behavioral intent from temporal sequences rather than reacting to isolated noisy frames.
 
 \begin{table}[!t]
 \caption{Individual Component Performance}
@@ -185,7 +185,7 @@ Table~\ref{tab:distributions} reports the generative distributions used for each
 \textbf{Signal} & \textbf{Genuine} & \textbf{Anomalous} \\
 \midrule
 IDE Similarity ($S_t$) & $\mathcal{N}(0.75, 0.15)$ & $\mathcal{N}(0.65, 0.15)$ \\
-IIM Instability ($I_t$) & $\mathcal{N}(0.15, 0.10)$ & $\mathcal{N}(0.25, 0.10)$ \\
+IIM Instability ($U_t$) & $\mathcal{N}(0.15, 0.10)$ & $\mathcal{N}(0.25, 0.10)$ \\
 PAM Presence ($P_t$) & $\mathcal{N}(0.85, 0.10)$ & $\mathcal{N}(0.75, 0.15)$ \\
 LDD Drift ($D_t$) & $\mathcal{N}(0.08, 0.06)$ & $\mathcal{N}(0.18, 0.10)$ \\
 GAM Gaze ($G_t$) & $\mathcal{N}(0.80, 0.12)$ & $\mathcal{N}(0.55, 0.18)$ \\

@@ -48,7 +48,7 @@
 %                         ABSTRACT
 % ===================================================================
 \begin{abstract}
-Automated online proctoring systems are critical for maintaining examination integrity in remote education, yet prevailing approaches rely on instantaneous rule-based event detection that produces excessive false positives and fails to capture temporal behavioral evolution. This paper reformulates exam integrity monitoring as a \emph{multi-signal temporal behavioral inference} problem. We introduce a seven-component neural architecture comprising six specialized temporal experts---an identity instability monitor~(IIM), a presence and attentiveness model~(PAM), a long-horizon drift detector~(LDD), a gaze attentiveness model~(GAM), and a head-gaze dynamics model~(HGDM)---anchored by a one-shot identity embedder~(IDE) under an immutable enrollment constraint. A Gated Recurrent Unit~(GRU)-based Risk Fusion Engine~(RFE) integrates six continuous behavioral signals into a session-level probabilistic risk trajectory. Crucially, the system features an \emph{uncertainty-aware formulation}, mapping the trajectory as a temporal Gaussian distribution $\mathcal{N}(\mu_t, \sigma_t^2)$ that yields both a risk probability~$\rho_t\!\in\![0,1]$ and an explicit prediction confidence metric~$\sigma_t$. Evaluation on 5\,000 procedurally generated sessions spanning seven behavioral classes demonstrates that temporal fusion achieves a session-level ROC-AUC of~$0.9992 \pm 0.0004$ from individually weak component signals (AUC~0.64--0.94), with an Expected Calibration Error of~0.0072. The integration of continuous uncertainty estimation allows the system to fundamentally distinguish between high-confidence integrity violations and inherently ambiguous, noisy sensor conditions, averting automated false accusations. Computational profiling confirms real-time feasibility at 82.66\,ms\,/\,frame on~CPU. These results provide quantitative evidence that temporal evidence accumulation with probabilistic uncertainty natively outperforms instantaneous thresholding for high-stakes behavioral monitoring.
+Automated online proctoring systems are critical for maintaining examination integrity in remote education, yet prevailing approaches rely on instantaneous rule-based event detection that produces excessive false positives and fails to capture temporal behavioral evolution. This paper reformulates exam integrity monitoring as a \emph{multi-signal temporal behavioral inference} problem. We introduce a seven-component neural architecture comprising six specialized temporal experts---an identity instability monitor~(IIM), a presence and attentiveness model~(PAM), a long-horizon drift detector~(LDD), a gaze attentiveness model~(GAM), and a head-gaze dynamics model~(HGDM)---anchored by a one-shot identity embedder~(IDE) under an immutable enrollment constraint. A Gated Recurrent Unit~(GRU)-based Risk Fusion Engine~(RFE) integrates six continuous behavioral signals into a session-level probabilistic risk trajectory. Crucially, the system features an \emph{uncertainty-aware formulation}, predicting a Gaussian distribution over the risk logit, parameterized by mean~$\mu_t$ and variance~$\sigma_t^2$, which yields both a risk probability~$\rho_t\!\in\![0,1]$ and an explicit prediction confidence metric~$\sigma_t$. Evaluation on 5\,000 procedurally generated sessions spanning seven behavioral classes demonstrates that temporal fusion achieves a session-level ROC-AUC of~$0.9992 \pm 0.0004$ from individually weak component signals (AUC~0.64--0.94), with an Expected Calibration Error of~0.0072. The integration of continuous uncertainty estimation allows the system to fundamentally distinguish between high-confidence integrity violations and inherently ambiguous, noisy sensor conditions, averting automated false accusations. Computational profiling confirms real-time feasibility at 82.66\,ms\,/\,frame on~CPU. These results provide quantitative evidence that temporal evidence accumulation with probabilistic uncertainty natively outperforms instantaneous thresholding for high-stakes behavioral monitoring.
 \end{abstract}
 
 % --- Keywords ---
@@ -137,12 +137,12 @@ $I_t$ & Webcam frame at timestep $t$ \\
 $I_{\mathrm{ref}}$ & Enrollment reference image \\
 $e_0, e_t$ & Reference / probe identity embeddings $\in \mathbb{R}^{256}$ \\
 $S_t$ & Cosine identity similarity \\
-$I_t$ & Identity instability signal (IIM output) \\
+$U_t$ & Identity instability signal (IIM output) \\
 $P_t$ & Presence confidence signal (PAM output) \\
 $D_t$ & Long-term drift signal (LDD output) \\
 $G_t$ & Gaze attentiveness signal (GAM output) \\
 $H_t$ & Head-gaze dynamics signal (HGDM output) \\
-$\mathbf{r}_t$ & Risk vector $[S_t, I_t, P_t, D_t, G_t, H_t]^{\!\top}$ \\
+$\mathbf{r}_t$ & Risk vector $[S_t, U_t, P_t, D_t, G_t, H_t]^{\!\top}$ \\
 $\rho_t$ & Fused risk output $\in [0,1]$ \\
 $h_t$ & GRU hidden state \\
 $T$ & Session length (frames) \\
@@ -191,7 +191,7 @@ Five specialized temporal experts process these features:
 \subsubsection{Identity Instability Model (IIM)}
 An LSTM with hidden dimension~32 processes the similarity sequence to detect abrupt impersonation and flickering substitution:
 \begin{equation}
-    I_t = \sigma\!\left(W_I \cdot \mathrm{LSTM}(S_t,\, h_{t-1}^{\mathrm{IIM}}) + b_I\right) \in [0,1]
+    U_t = \sigma\!\left(W_I \cdot \mathrm{LSTM}(S_t,\, h_{t-1}^{\mathrm{IIM}}) + b_I\right) \in [0,1]
     \label{eq:iim}
 \end{equation}
 
@@ -229,7 +229,7 @@ where $\mathbf{hg}_t = [\psi_t^h, \theta_t^h, \phi_t^h, \psi_t^g, \theta_t^g, \D
 
 The \textbf{Risk Fusion Engine (RFE)} is a GRU~\cite{Cho2014} that maintains a hidden state~$h_t$ encoding cumulative session evidence. At each timestep, the six signals are concatenated into a risk vector:
 \begin{equation}
-    \mathbf{r}_t = [S_t,\, I_t,\, P_t,\, D_t,\, G_t,\, H_t]^\top \in \mathbb{R}^6
+    \mathbf{r}_t = [S_t,\, U_t,\, P_t,\, D_t,\, G_t,\, H_t]^\top \in \mathbb{R}^6
     \label{eq:riskvec}
 \end{equation}
 The GRU update equations are:
@@ -239,7 +239,7 @@ The GRU update equations are:
     \tilde{h}_t &= \tanh(W_h \mathbf{r}_t + U_h (r_t \odot h_{t-1}) + b_h) \label{eq:gru_h} \\
     h_t &= (1 - z_t) \odot h_{t-1} + z_t \odot \tilde{h}_t \label{eq:gru_update}
 \end{align}
-To enable uncertainty-aware risk estimation, the engine projects the hidden state into a two-parameter temporal Gaussian distribution characterizing the mean risk logit $\mu_t$ and its log-variance $\log \sigma_t^2$:
+To enable uncertainty-aware risk estimation, the engine predicts a Gaussian distribution over the risk logit, parameterized by mean~$\mu_t$ and log-variance~$\log \sigma_t^2$, by projecting the hidden state:
 \begin{equation}
     [\mu_t, \log \sigma_t^2]^\top = W_o h_t + b_o 
     \label{eq:uncertainty_proj}
@@ -273,12 +273,12 @@ Algorithm~\ref{alg:inference} summarizes the comprehensive forward-pass inferenc
 \FOR{$t = 1$ \TO $T$}
     \STATE $e_t \leftarrow f_\theta(I_t) / \lVert f_\theta(I_t) \rVert_2$
     \STATE $S_t \leftarrow e_t^\top e_0$;\quad $\delta_t \leftarrow e_t - e_0$
-    \STATE $I_t \leftarrow \mathrm{IIM}(S_t)$ \COMMENT{Identity instability}
+    \STATE $U_t \leftarrow \mathrm{IIM}(S_t)$ \COMMENT{Identity instability}
     \STATE $P_t \leftarrow \mathrm{PAM}(\mathbf{p}_t)$ \COMMENT{Presence}
     \STATE $D_t \leftarrow \mathrm{LDD}([\delta_t \| S_t])$ \COMMENT{Drift}
     \STATE $G_t \leftarrow \mathrm{GAM}(\mathbf{g}_t)$ \COMMENT{Gaze}
     \STATE $H_t \leftarrow \mathrm{HGDM}(\mathbf{hg}_t)$ \COMMENT{Head-gaze}
-    \STATE $\mathbf{r}_t \leftarrow [S_t, I_t, P_t, D_t, G_t, H_t]^\top$
+    \STATE $\mathbf{r}_t \leftarrow [S_t, U_t, P_t, D_t, G_t, H_t]^\top$
     \STATE $h_t \leftarrow \mathrm{GRU}(\mathbf{r}_t, h_{t-1})$
     \STATE $[\mu_t, \log \sigma_t^2]^\top \leftarrow W_o h_t + b_o$
     \STATE $\rho_t \leftarrow \sigma(\mu_t)$
@@ -316,7 +316,7 @@ Algorithm~\ref{alg:inference} summarizes the comprehensive forward-pass inferenc
 \textbf{Comp.} & \textbf{Architecture} & \textbf{Output} & \textbf{Horizon} & \textbf{AUC} \\
 \midrule
 IDE & ResNet-50 & $S_t$ & Frame & 0.640 \\
-IIM & LSTM ($h{=}32$) & $I_t$ & 5--10\,s & 0.650 \\
+IIM & LSTM ($h{=}32$) & $U_t$ & 5--10\,s & 0.650 \\
 PAM & BiLSTM ($h{=}64$) & $P_t$ & 5--10\,s & 0.923 \\
 LDD & BiLSTM ($h{=}128$) & $D_t$ & 120\,fr & 0.785 \\
 GAM & BiLSTM$^2$ ($h{=}64$) & $G_t$ & 120\,fr & 0.894 \\
@@ -358,7 +358,7 @@ Table~\ref{tab:distributions} reports the generative parameters. Distributions a
 \textbf{Signal} & \textbf{Genuine} & \textbf{Anomalous} \\
 \midrule
 $S_t$ (Identity) & $\mathcal{N}(0.75, 0.15)$ & $\mathcal{N}(0.65, 0.15)$ \\
-$I_t$ (Instability) & $\mathcal{N}(0.15, 0.10)$ & $\mathcal{N}(0.25, 0.10)$ \\
+$U_t$ (Instability) & $\mathcal{N}(0.15, 0.10)$ & $\mathcal{N}(0.25, 0.10)$ \\
 $P_t$ (Presence) & $\mathcal{N}(0.85, 0.10)$ & $\mathcal{N}(0.75, 0.15)$ \\
 $D_t$ (Drift) & $\mathcal{N}(0.08, 0.06)$ & $\mathcal{N}(0.18, 0.10)$ \\
 $G_t$ (Gaze) & $\mathcal{N}(0.80, 0.12)$ & $\mathcal{N}(0.55, 0.18)$ \\
@@ -423,7 +423,7 @@ Table~\ref{tab:ablation} presents leave-one-out ablation results. Removing LDD p
 \midrule
 \textbf{Full (6-signal)} & \textbf{.9992} & --- & \textbf{.9994} & --- & \textbf{.0084} \\
 $-$ IDE ($S_t$) & .9981 & $-.0011$ & .9985 & $-.0009$ & .0121 \\
-$-$ IIM ($I_t$) & .9942 & $-.0050$ & .9955 & $-.0039$ & .0210 \\
+$-$ IIM ($U_t$) & .9942 & $-.0050$ & .9955 & $-.0039$ & .0210 \\
 $-$ PAM ($P_t$) & .9935 & $-.0057$ & .9942 & $-.0052$ & .0285 \\
 $-$ \textbf{LDD} ($D_t$) & \textbf{.9582} & $\mathbf{-.0410}$ & \textbf{.9655} & $\mathbf{-.0339}$ & \textbf{.0755} \\
 \bottomrule
@@ -438,7 +438,7 @@ $-$ \textbf{LDD} ($D_t$) & \textbf{.9582} & $\mathbf{-.0410}$ & \textbf{.9655} &
 
 \subsection{Gaze Signal Ablation}
 
-To quantify the contribution of gaze modeling, we compared a 4-signal baseline ($S, I, P, D$) against a 5-signal model with GAM on a gaze-enriched dataset (Table~\ref{tab:ablation_gaze}). The $+0.4478$~AUC improvement demonstrates that gaze is indispensable for non-identity anomalies.
+To quantify the contribution of gaze modeling, we compared a 4-signal baseline ($S, U, P, D$) against a 5-signal model with GAM on a gaze-enriched dataset (Table~\ref{tab:ablation_gaze}). The $+0.4478$~AUC improvement demonstrates that gaze is indispensable for non-identity anomalies.
 
 \begin{table}[t]
 \caption{Gaze Signal Ablation}
@@ -449,8 +449,8 @@ To quantify the contribution of gaze modeling, we compared a 4-signal baseline (
 \toprule
 \textbf{Configuration} & \textbf{Signals} & \textbf{AUC} \\
 \midrule
-Baseline (4-signal) & $S, I, P, D$ & 0.5512 \\
-With GAM (5-signal) & $S, I, P, D, G$ & \textbf{0.9990} \\
+Baseline (4-signal) & $S, U, P, D$ & 0.5512 \\
+With GAM (5-signal) & $S, U, P, D, G$ & \textbf{0.9990} \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -641,13 +641,13 @@ The backbone dominates latency (57.8\%) and parameters (95.6\%). All non-backbon
 
 Deployment in high-stakes educational settings requires interpretable risk assessments. We implement temporal attribution via gradient-based local sensitivity analysis~\cite{Sundararajan2017}.
 
-For each frame~$t$ and signal~$i \in \{S, I, P, D, G, H\}$, the contribution to $\rho_t$ is:
+For each frame~$t$ and signal~$i \in \{S, U, P, D, G, H\}$, the contribution to $\rho_t$ is:
 \begin{equation}
     \alpha_{t,i} = \left| \frac{\partial \rho_t}{\partial r_{t,i}} \right|, \qquad
     \hat{\alpha}_{t,i} = \frac{\alpha_{t,i}}{\sum_{j=1}^{6} \alpha_{t,j}}
     \label{eq:attribution}
 \end{equation}
-producing a $T \times 6$ attribution matrix. As shown in Fig.~\ref{fig:xai}, the RFE assigns high importance to $D_t$ and $I_t$ during substitution attacks while suppressing gaze and presence channels, enabling human proctors to validate which behavioral dimension triggered the risk elevation.
+producing a $T \times 6$ attribution matrix. As shown in Fig.~\ref{fig:xai}, the RFE assigns high importance to $D_t$ and $U_t$ during substitution attacks while suppressing gaze and presence channels, enabling human proctors to validate which behavioral dimension triggered the risk elevation.
 
 \begin{figure}[t]
 \centerline{\includegraphics[width=\columnwidth]{temporal_attribution.png}}
