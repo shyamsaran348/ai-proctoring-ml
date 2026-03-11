@@ -56,7 +56,7 @@ Early research focused on specialized hardware such as biometric mice for keystr
 Subsequent work targeted gaze estimation and head pose as attentiveness proxies. Seminal efforts relied on iris detection via Hough transforms and geometric rules to flag off-screen gazes~\cite{Li2018}. These systems proved brittle under varied lighting and failed to distinguish natural keyboard glances from sustained suspicious gazes. Deep CNNs for static frame classification improved robustness~\cite{Doughty2022, Ghizlane2019}, yet ignored the vital temporal context that differentiates momentary glances from deliberate cheating.
 
 \begin{figure}[!t]
-\centerline{\includegraphics[width=\columnwidth]{literature_comparison.png}}
+\centerline{\includegraphics[width=\columnwidth]{literature_comparison}}
 \caption{Conceptual comparison of proctoring paradigms. Rule-based and static CNN approaches provide baseline protection, but temporal memory models (LSTM/GRU) significantly enhance detection of temporally evolving anomalies. Our system integrates multi-signal evidence over the full session duration.}
 \label{fig:lit_comp}
 \end{figure}
@@ -74,7 +74,7 @@ Current trends analyze micro-expressions and emotional states to infer engagemen
 The proposed system operates through a cascaded temporal architecture comprising seven components organized into three phases: Enrollment, Per-Frame Signal Extraction, and Probabilistic Risk Fusion. Figure~\ref{fig:flow} summarizes the temporal evidence flow.
 
 \begin{figure}[!t]
-\centerline{\includegraphics[width=\columnwidth]{evidence_flow.png}}
+\centerline{\includegraphics[width=\columnwidth]{evidence_flow}}
 \caption{Temporal evidence flow. Six raw behavioral signals ($S_t, U_t, P_t, D_t, G_t, H_t$), each individually noisy and weak, are processed by specialized temporal experts (IIM, PAM, LDD, GAM, HGDM) and fused by a GRU-based Risk Fusion Engine (RFE) into a smooth session-level risk trajectory $\rho_t$.}
 \label{fig:flow}
 \end{figure}
@@ -104,7 +104,7 @@ The core of the system is the \textbf{Risk Fusion Engine (RFE)}, a Gated Recurre
 Rather than extreme point estimation, the system projects the hidden state into a two-parameter Gaussian distribution $[\mu_t, \log \sigma_t^2]^\top = W_o h_t + b_o$. The risk output $\rho_t = \sigma(\mu_t)$ is a continuous probability $\in [0, 1]$, trained end-to-end alongside the uncertainty metric $\sigma_t$, allowing the architecture to quantify its own confidence.
 
 \begin{figure}[!t]
-\centerline{\includegraphics[width=\columnwidth]{workflow.png}}
+\centerline{\includegraphics[width=\columnwidth]{workflow}}
 \caption{System workflow. Enrollment: IDE produces the immutable embedding $e_0$. Live Monitoring: per-frame pipeline produces signals $U_t, P_t, D_t, G_t, H_t$ from IIM, PAM, LDD, GAM, and HGDM respectively, fused by RFE. Session End: final risk $\rho_t$ forwarded for human review.}
 \label{fig:workflow}
 \end{figure}
@@ -154,7 +154,7 @@ HGDM & Pose-gaze dynamics & 0.9415 & 0.9120 \\
 \end{table}
 
 \begin{figure}[!t]
-\centerline{\includegraphics[width=\columnwidth]{system_architecture.png}}
+\centerline{\includegraphics[width=\columnwidth]{system_architecture}}
 \caption{Technical system architecture. IDE (ResNet-50) is shared across enrollment and per-frame processing. The immutable embedding $e_0$ anchors IIM and LDD. PAM independently processes 6D presence features. GAM and HGDM handle gaze and pose-gaze dynamics. All six signals are fused by RFE (GRU) into session risk $\rho_t$.}
 \label{fig:arch}
 \end{figure}
@@ -274,7 +274,7 @@ Ablate PAM (Presence) & 0.9935 & $-0.0057$ & 0.9942 & $-0.0052$ & 0.0285 \\
 \end{table}
 
 \begin{figure}[!t]
-\centerline{\includegraphics[width=\columnwidth]{ablation.png}}
+\centerline{\includegraphics[width=\columnwidth]{ablation}}
 \caption{Signal ablation results. Removing LDD (long-horizon drift) causes the largest performance drop ($\Delta$ROC $= -0.0410$), confirming the primacy of temporal drift detection.}
 \label{fig:ablation}
 \end{figure}
@@ -299,7 +299,7 @@ B3: Non-Temporal MLP & 0.9975 & $-0.0017$ & 0.9980 & 0.0185 \\
 \end{table}
 
 \begin{figure}[!t]
-\centerline{\includegraphics[width=\columnwidth]{baselines.png}}
+\centerline{\includegraphics[width=\columnwidth]{baselines}}
 \caption{Baseline comparison. ROC-AUC and Brier Score for all models. The Temporal GRU achieves the highest ROC-AUC (0.9992) and lowest Brier Score (0.0084).}
 \label{fig:baselines}
 \end{figure}
@@ -322,31 +322,31 @@ Mean + LogReg & 0.0083 & 0.0330 & \textbf{0.0002} & 0.2169 \\
 \end{table}
 
 \begin{figure}[!t]
-\centerline{\includegraphics[width=\columnwidth]{calibration.png}}
+\centerline{\includegraphics[width=\columnwidth]{calibration}}
 \caption{Reliability diagram. The Temporal GRU achieves ECE $= 0.0072$ with highly concentrated predictions in the extreme confidence bins.}
 \label{fig:calib}
 \end{figure}
 
 \begin{figure}[!t]
-\centerline{\includegraphics[width=\columnwidth]{trajectories.png}}
+\centerline{\includegraphics[width=\columnwidth]{trajectories}}
 \caption{Risk trajectories $\rho_{1:T}$ for all five session archetypes across 120~frames. Genuine sessions remain near zero; anomalous sessions converge to high risk with class-specific temporal signatures.}
 \label{fig:traj}
 \end{figure}
 
 \begin{figure}[!t]
-\centerline{\includegraphics[width=\columnwidth]{evidence_accumulation.png}}
+\centerline{\includegraphics[width=\columnwidth]{evidence_accumulation}}
 \caption{Temporal evidence accumulation mechanism. Stage~1: multiple weak, noisy signals (Identity, Presence, Gaze). Stage~2: the GRU integrates these signals into a stable, high-confidence risk trajectory $\rho_t$, suppressing localized noise and frame-level uncertainty.}
 \label{fig:evidence}
 \end{figure}
 
 \begin{figure}[!t]
-\centerline{\includegraphics[width=\columnwidth]{pose_gaze_scatter.png}}
+\centerline{\includegraphics[width=\columnwidth]{pose_gaze_scatter}}
 \caption{Decoupling of head pose and gaze dynamics. Coupled behavior maintains strong pitch/yaw correlation, while anomalies (phone usage, side-monitor glancing) create distinct distribution shifts captured by HGDM.}
 \label{fig:decoupling}
 \end{figure}
 
 \begin{figure}[!t]
-\centerline{\includegraphics[width=\columnwidth]{temporal_attribution.png}}
+\centerline{\includegraphics[width=\columnwidth]{temporal_attribution}}
 \caption{Temporal signal attribution (XAI). Top: signal trajectories for a substitution session. Bottom: heatmap of signal importance weights via local sensitivity analysis. The model assigns high importance to Drift ($D$) and Instability ($I$) as $\rho_t$ increases, providing frame-level justification for human proctors.}
 \label{fig:xai}
 \end{figure}

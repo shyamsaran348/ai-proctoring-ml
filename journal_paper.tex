@@ -289,19 +289,19 @@ Algorithm~\ref{alg:inference} summarizes the comprehensive forward-pass inferenc
 \end{algorithm}
 
 \begin{figure}[t]
-\centerline{\includegraphics[width=\columnwidth]{system_architecture.png}}
+\centerline{\includegraphics[width=\columnwidth]{system_architecture}}
 \caption{System architecture. IDE~(ResNet-50) is shared across enrollment and per-frame processing. The immutable embedding~$e_0$ anchors IIM and LDD. PAM independently processes presence features. GAM and HGDM handle gaze and pose-gaze dynamics. All six signals converge at the RFE~(GRU) for temporal fusion into the session risk trajectory~$\rho_t$.}
 \label{fig:arch}
 \end{figure}
 
 \begin{figure}[t]
-\centerline{\includegraphics[width=\columnwidth]{evidence_flow.png}}
+\centerline{\includegraphics[width=\columnwidth]{evidence_flow}}
 \caption{Temporal evidence flow. Six individually noisy behavioral signals are processed by specialized temporal experts and fused by the GRU-based RFE into a smooth, high-confidence risk trajectory.}
 \label{fig:flow}
 \end{figure}
 
 \begin{figure}[t]
-\centerline{\includegraphics[width=\columnwidth]{workflow.png}}
+\centerline{\includegraphics[width=\columnwidth]{workflow}}
 \caption{System workflow. \emph{Enrollment:} IDE extracts the immutable anchor~$e_0$. \emph{Live monitoring:} per-frame pipeline produces signals fused by RFE. \emph{Session end:} risk trajectory and attribution data forwarded for human review.}
 \label{fig:workflow}
 \end{figure}
@@ -431,7 +431,7 @@ $-$ \textbf{LDD} ($D_t$) & \textbf{.9582} & $\mathbf{-.0410}$ & \textbf{.9655} &
 \end{table}
 
 \begin{figure}[t]
-\centerline{\includegraphics[width=\columnwidth]{ablation.png}}
+\centerline{\includegraphics[width=\columnwidth]{ablation}}
 \caption{Signal ablation. Removing LDD causes the largest drop ($\Delta$AUC$\,{=}\,{-}0.041$), confirming the primacy of long-horizon drift detection.}
 \label{fig:ablation}
 \end{figure}
@@ -490,7 +490,7 @@ The threshold classifier is separated by $\Delta\mathrm{AUC} = 0.178$. The GRU's
 Despite high aggregate performance, an explicit analysis of edge-case failures---defined as False Positives (FP) and False Negatives (FN) relative to a tuned decision boundary at $0.5$---reveals specific limitations in the temporal representation. Qualitative review of the system's false negatives indicates they predominantly cluster around ``Sophisticated Drift'' attacks where the adversary's embedding trajectory is engineered to never deviate more than the AR(1) scalar bounds of genuine micro-movements, tricking the LDD into accumulating insufficient evidence. Conversely, false positives primarily stem from compounded, synchronous noise bursts across independent modalities (e.g., simultaneous low face-detection confidence and exaggerated pitch from an innocent stretch) that perfectly mimicked the temporal signature of a ``Flickering Substitution''.
 
 \begin{figure}[t]
-\centerline{\includegraphics[width=\columnwidth]{baselines.png}}
+\centerline{\includegraphics[width=\columnwidth]{baselines}}
 \caption{Baseline comparison. The temporal GRU achieves the highest AUC~(0.9992) and lowest Brier score~(0.0084).}
 \label{fig:baselines}
 \end{figure}
@@ -557,7 +557,7 @@ Mean + LR & .0083 & .0330 & \textbf{.0002} & .2169 \\
 The GRU achieves ECE$\,{=}\,0.0072$ with 97.8\% of predictions in the extreme bins $[0,\,0.1]$ or $[0.9,\,1.0]$. Mean+LR exhibits a \emph{calibration paradox}: near-perfect per-bin reliability (Rel.$\,{=}\,0.0002$) but $2.6{\times}$ worse Brier score due to lower resolution, confirming that calibration alone does not guarantee discriminative power~\cite{Brier1950}.
 
 \begin{figure}[t]
-\centerline{\includegraphics[width=\columnwidth]{calibration.png}}
+\centerline{\includegraphics[width=\columnwidth]{calibration}}
 \caption{Reliability diagram. The GRU achieves ECE$\,{=}\,0.0072$ with concentrated extreme-bin predictions.}
 \label{fig:calib}
 \end{figure}
@@ -585,13 +585,13 @@ Flickering Subst. & .9967 & $+$.0042 & .987 & 119 \\
 All trajectories exhibit smoothness $\geq 0.971$, confirming noise suppression via temporal integration. The Presence Absence class peaks at frame~87, reflecting the departure window rather than the session endpoint---demonstrating principled evidence integration. Representative trajectories are shown in Figs.~\ref{fig:traj} and~\ref{fig:evidence}.
 
 \begin{figure}[t]
-\centerline{\includegraphics[width=\columnwidth]{trajectories.png}}
+\centerline{\includegraphics[width=\columnwidth]{trajectories}}
 \caption{Risk trajectories~$\rho_{1:T}$ for five session archetypes. Genuine sessions remain near zero; anomalous sessions converge to high risk with class-specific temporal signatures.}
 \label{fig:traj}
 \end{figure}
 
 \begin{figure}[t]
-\centerline{\includegraphics[width=\columnwidth]{evidence_accumulation.png}}
+\centerline{\includegraphics[width=\columnwidth]{evidence_accumulation}}
 \caption{Evidence accumulation. Weak, noisy signals are integrated into a stable risk trajectory, suppressing frame-level uncertainty.}
 \label{fig:evidence}
 \end{figure}
@@ -601,7 +601,7 @@ All trajectories exhibit smoothness $\geq 0.971$, confirming noise suppression v
 Fig.~\ref{fig:decoupling} visualizes the head-gaze correlation distribution. Normal behavior maintains strong pitch correlation; anomalies such as phone usage create measurable decorrelation that HGDM detects.
 
 \begin{figure}[t]
-\centerline{\includegraphics[width=\columnwidth]{pose_gaze_scatter.png}}
+\centerline{\includegraphics[width=\columnwidth]{pose_gaze_scatter}}
 \caption{Pose-gaze decoupling. Genuine behavior (coupled) maintains strong pitch correlation, while phone usage and side-monitor glancing create distribution shifts captured by HGDM.}
 \label{fig:decoupling}
 \end{figure}
@@ -650,7 +650,7 @@ For each frame~$t$ and signal~$i \in \{S, U, P, D, G, H\}$, the contribution to 
 producing a $T \times 6$ attribution matrix. As shown in Fig.~\ref{fig:xai}, the RFE assigns high importance to $D_t$ and $U_t$ during substitution attacks while suppressing gaze and presence channels, enabling human proctors to validate which behavioral dimension triggered the risk elevation.
 
 \begin{figure}[t]
-\centerline{\includegraphics[width=\columnwidth]{temporal_attribution.png}}
+\centerline{\includegraphics[width=\columnwidth]{temporal_attribution}}
 \caption{Temporal signal attribution. \emph{Top:} signal trajectories during a substitution session. \emph{Bottom:} attribution heatmap showing signal importance. Drift~($D$) and Instability~($I$) dominate as $\rho_t$ increases.}
 \label{fig:xai}
 \end{figure}
