@@ -11,38 +11,6 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'
 
 from proctoring_ml_module.models.architectures import ResNetEmbedder
 
-class ScoreNormalizer:
-    """
-    Applies T-Norm (Target Normalization) to calibrate similarity scores.
-    Assumes an impostor distribution N(mean, std).
-    """
-    def __init__(self, mean=0.3, std=0.1):
-        self.mean = mean
-        self.std = std
-
-    def normalize(self, raw_score):
-        # Z-Norm
-        z_score = (raw_score - self.mean) / (self.std + 1e-6)
-        
-        # Sigmoid squash to keep in 0-1 range for downstream LSTM
-        # Centering: decision boundary approx 0.6 in raw score -> Z=3.0 -> Sigmoid ~0.95
-        # We want 0.3 (mean impostor) -> Z=0 -> Sigmoid 0.5? No, impostor should be low.
-        # Let's shift Z. If Z=0 (typical impostor), we want score ~0.1.
-        # If we use raw sigmoid: 1 / (1 + exp(-z)). Z=0 -> 0.5.
-        # Maybe simply return the Z-score and let UC2/UC5 handle it?
-        # But UC2 expects 0-1 likely (based on previous logs/code).
-        # Let's map: 
-        # range [0.0, 1.0].
-        # Clip Z to [-3, 3] then map to [0,1]?
-        # Or just use raw score? The prompt asks for T-Norm.
-        # "Used before feeding UC2".
-        # Let's use a calibrated sigmoid that pushes impostors down.
-        # calibrated = 1 / (1 + exp(-(z_score - 2.0))) 
-        # If raw=0.3 (meam), z=0, exp(2) ~7.3, 1/8.3 ~ 0.12 (Low, Good).
-        # If raw=0.7 (match), z=4, exp(-2) ~0.13, 1/1.13 ~ 0.88 (High, Good).
-        normalized = 1.0 / (1.0 + np.exp(-(z_score - 2.0)))
-        return float(normalized)
-
 class UC1Engine:
     def __init__(self, config):
         """
@@ -54,22 +22,14 @@ class UC1Engine:
         self.embedding_dim = config['models']['uc1'].get('embedding_dim', 256)
         
         # Initialize model
-        self.model = ResNetEmbedder(embedding_dim=self.embedding_dim, pretrained=False)
+        self.model = ResNetEmbedder(embedding_dim=self.embedding_dim, pretrained=True)
         self.load_weights()
         self.model.to(self.device)
         self.model.eval()
-        
-        # FP16 Efficiency check
-        if self.device.type != 'cpu':
-             self.model.half()
-
-        # Score Normalizer
-        self.normalizer = ScoreNormalizer()
-
-        # Caching
-        self.enrollment_cache = {}
 
         # Preprocessing (Standard ImageNet)
+        # Note: Preprocessing should match training (VGGFace2 usually uses ImageNet stats or similar)
+        # We assume config provides these or we use defaults.
         mean = config.get('inference', {}).get('enrollment_transform', {}).get('mean', [0.485, 0.456, 0.406])
         std = config.get('inference', {}).get('enrollment_transform', {}).get('std', [0.229, 0.224, 0.225])
         size = config.get('inference', {}).get('enrollment_transform', {}).get('resize', 224)
@@ -83,9 +43,12 @@ class UC1Engine:
     def load_weights(self):
         if os.path.exists(self.model_path):
             state_dict = torch.load(self.model_path, map_location=self.device)
+            # Handle potential DataParallel wrapping or key mismatches if necessary
+            # For now, assume direct match or 'state_dict' key
             if 'state_dict' in state_dict:
                 state_dict = state_dict['state_dict']
             
+            # Simple fix for 'module.' prefix if trained with DataParallel
             new_state_dict = {}
             for k, v in state_dict.items():
                 if k.startswith('module.'):
@@ -106,46 +69,32 @@ class UC1Engine:
         Returns:
             embedding: torch.Tensor of shape (1, embedding_dim)
         """
-        # 1. Check Cache (if input is path)
-        if isinstance(image_input, str) and image_input in self.enrollment_cache:
-            return self.enrollment_cache[image_input]
-
         img = self._prepare_image(image_input)
         if img is None:
-            return None 
+            return None # Handle loading error
 
-        img_tensor = self.transform(img).unsqueeze(0).to(self.device)
-        if self.device.type != 'cpu':
-            img_tensor = img_tensor.half()
+        img_tensor = self.transform(img).unsqueeze(0).to(self.device) # (1, 3, 224, 224)
         
-        # 2. Optimized Inference
-        with torch.inference_mode():
-            emb = self.model(img_tensor)
+        with torch.no_grad():
+            emb = self.model(img_tensor) # (1, 256) normalized
         
-        # Cache Result (Small RAM footprint for embeddings)
-        if isinstance(image_input, str):
-            self.enrollment_cache[image_input] = emb
-
         return emb
 
     def compute_similarity(self, emb1, emb2):
         """
-        Compute Normalized Cosine Similarity.
+        Compute Cosine Similarity between two embeddings.
         Args:
             emb1: (1, D) tensor
             emb2: (1, D) tensor
         Returns:
-            similarity: float (0 to 1, calibrated)
+            similarity: float (-1 to 1)
         """
         if emb1 is None or emb2 is None:
             return 0.0
             
-        raw_sim = torch.mm(emb1, emb2.T).item()
-        
-        # Apply T-Norm Calibration
-        norm_sim = self.normalizer.normalize(raw_sim)
-        
-        return norm_sim
+        # Since embeddings are L2 normalized by the model:
+        # Cosine Similarity = Dot Product
+        return torch.mm(emb1, emb2.T).item()
 
     def _prepare_image(self, image_input):
         try:

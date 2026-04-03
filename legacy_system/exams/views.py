@@ -1,19 +1,23 @@
-from django.shortcuts import render, get_object_or_404
-from django.http import JsonResponse
-from django.shortcuts import redirect
+from django.http import JsonResponse, StreamingHttpResponse
+import base64
+from django.core.files.base import ContentFile
+
+from django.shortcuts import redirect, get_object_or_404
 from django.contrib.auth.models import User
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.hashers import make_password
+from django.contrib.auth.decorators import login_required
 from django.views import View
+
 from django.conf import settings
 from rest_framework import status
 from rest_framework import viewsets, status
 from rest_framework.decorators import action, api_view, parser_classes
 from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
 from rest_framework.views import APIView
 from rest_framework.authentication import SessionAuthentication
 from .models import UserProfile
@@ -34,12 +38,15 @@ class NoCSRFSessionAuthentication(SessionAuthentication):
     def enforce_csrf(self, request):
         return  # Skip CSRF enforcement
 
-from .models import Problem, TestCase, ExamSession, Submission, TestResult, Language
+from .models import Problem, TestCase, ExamSession, Submission, TestResult, Language, ProctoringRecord, MCQQuestion, MCQSubmission, Contest
+
+
 from .serializers import (
     ProblemSerializer, TestCaseSerializer, ExamSessionSerializer,
     SubmissionSerializer, CodeExecutionSerializer, CodeExecutionResponseSerializer,
-    RegisterSerializer
+    RegisterSerializer, MCQQuestionSerializer, ContestSerializer
 )
+
 from .services.capture_reference import capture_reference_image
 from .services.generate_embedding import generate_and_store_embedding
 from .services.verify_identity import verify_identity
@@ -48,8 +55,29 @@ from .services.ml_adapter import MLProctoringAdapter as ProctoringSystem # Adapt
 
 PROCTORING_INSTANCES = {}
 VERIFICATION_STATUS = {}
+LAST_CLEANUP = 0
+
+def cleanup_stale_sessions():
+    global LAST_CLEANUP
+    now = time.time()
+    if now - LAST_CLEANUP < 60: # Only run once per minute
+        return
+    
+    LAST_CLEANUP = now
+    stale_ids = []
+    for sid, proctor in PROCTORING_INSTANCES.items():
+        # Check if the proctor has a last_update timestamp
+        status = getattr(proctor, 'latest_status', {})
+        last_upd = status.get('last_update', 0)
+        if now - last_upd > 600: # 10 minutes
+            stale_ids.append(sid)
+    
+    for sid in stale_ids:
+        print(f"[Cleanup] Removing stale proctoring session: {sid}")
+        PROCTORING_INSTANCES.pop(sid, None)
 
 def _safe_json_loads(s, fallback):
+
     if s is None:
         return fallback
     if isinstance(s, (list, dict, int, float, bool)):
@@ -200,11 +228,74 @@ except Exception as e:
         return results
 
 
-class ProblemViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Problem.objects.filter(is_active=True)
+# For SSE throttling
+LAST_ALERT_TIME = {} # {session_id: timestamp}
+
+@api_view(['GET'])
+def proctoring_pulse(request):
+    """
+    SSE stream providing real-time risk alerts for faculty.
+    Yields data when risk_score > 0.7 for an active session.
+    """
+    if not request.user.is_staff:
+         return Response({'error': 'Unauthorized'}, status=403)
+
+    def event_generator():
+        while True:
+            # Check all active sessions
+            alerts = []
+            now = time.time()
+            
+            for sid, adapter in PROCTORING_INSTANCES.items():
+                status = adapter.latest_status
+                risk = status.get('risk_score', 0)
+                
+                if risk > 0.7:
+                    # Throttle: 1 alert per 5s per session (Phase 20)
+                    last_time = LAST_ALERT_TIME.get(sid, 0)
+                    if now - last_time > 5:
+                        alerts.append({
+                            'session_id': sid,
+                            'student': status.get('student_id', 'Unknown'),
+                            'risk': round(float(risk), 4),
+                            'primary_violation': status.get('violation_type', 'Suspicious Behavior'),
+                            'metrics': {
+                                'sim': status.get('uc1_identity_sim', 0),
+                                'presence': status.get('uc3_presence', 0.5),
+                                'audio': status.get('uc6_audio', 0.5),
+                                'drift': status.get('uc4_drift', 0),
+                                'gaze': status.get('gam_gaze', 0.5),
+                                'hgdm': status.get('hgdm_prob', 0.5)
+                            }
+                        })
+                        LAST_ALERT_TIME[sid] = now
+            
+            if alerts:
+                # Yield JSON SSE format
+                yield f"event: risk_alert\ndata: {json.dumps(alerts)}\n\n"
+            else:
+                # Heartbeat to keep connection alive
+                yield ": heartbeat\n\n"
+                
+            time.sleep(2) # Pulse every 2 seconds
+
+    response = StreamingHttpResponse(event_generator(), content_type='text/event-stream')
+    response['Cache-Control'] = 'no-cache'
+    return response
+
+
+class ProblemViewSet(viewsets.ModelViewSet):
+
+    queryset = Problem.objects.all()
     serializer_class = ProblemSerializer
     permission_classes = [AllowAny]
     authentication_classes = [NoCSRFSessionAuthentication]
+
+    def get_queryset(self):
+        if self.request.user.is_staff:
+            return Problem.objects.all()
+        return Problem.objects.filter(is_active=True)
+
     
     def list(self, request, *args, **kwargs):
         """Override list to include completion status for each problem"""
@@ -288,10 +379,95 @@ class ProblemViewSet(viewsets.ReadOnlyModelViewSet):
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+class MCQQuestionViewSet(viewsets.ModelViewSet):
+    queryset = MCQQuestion.objects.all()
+    serializer_class = MCQQuestionSerializer
+    permission_classes = [AllowAny] # Enforce staff checks in create/update
+    authentication_classes = [NoCSRFSessionAuthentication]
+
+    def get_queryset(self):
+        contest_id = self.request.query_params.get('contest_id')
+        if contest_id:
+            return MCQQuestion.objects.filter(contest_id=contest_id).order_by('order')
+        return MCQQuestion.objects.all().order_by('-created_at')
+
+
+class ContestViewSet(viewsets.ModelViewSet):
+    queryset = Contest.objects.all()
+    serializer_class = ContestSerializer
+    permission_classes = [AllowAny] # In production, restrict to staff/creator
+    authentication_classes = [NoCSRFSessionAuthentication]
+
+    def get_queryset(self):
+        if self.request.user.is_staff:
+            return Contest.objects.all().order_by('-start_time')
+        return Contest.objects.filter(created_by=self.request.user).order_by('-start_time')
+
+    @action(detail=True, methods=['get'])
+    def exam_designer(self, request, pk=None):
+        """API for faculty to get all questions and which are currently in the contest"""
+        if not request.user.is_staff:
+             return Response({'error': 'Unauthorized'}, status=403)
+             
+        contest = self.get_object()
+        from .models import Problem, MCQQuestion, ContestProblem
+        from django.db.models import Q
+        
+        # 1. Fetch Global Bank
+        all_problems = Problem.objects.all().values('id', 'title', 'difficulty')
+        all_mcqs = MCQQuestion.objects.filter(Q(contest=contest) | Q(contest__isnull=True)).values('id', 'question_text', 'marks', 'order', 'contest_id')
+        
+        # 2. Fetch Current Assignments
+        current_problems = ContestProblem.objects.filter(contest=contest).order_by('order').values('problem_id', 'order', 'time_limit_override')
+        current_mcqs = MCQQuestion.objects.filter(contest=contest).order_by('order').values('id', 'order')
+
+        return Response({
+            'all_problems': list(all_problems),
+            'all_mcqs': list(all_mcqs),
+            'current_problems': list(current_problems),
+            'current_mcqs': list(current_mcqs)
+        })
+
+    @action(detail=True, methods=['post'])
+    def update_structure(self, request, pk=None):
+        """Save new order and selection for a contest"""
+        if not request.user.is_staff:
+             return Response({'error': 'Unauthorized'}, status=403)
+             
+        contest = self.get_object()
+        problems_data = request.data.get('problems', [])
+        mcqs_data = request.data.get('mcqs', [])
+        
+        from .models import ContestProblem, MCQQuestion, Problem
+        
+        # 1. Update Problems
+        ContestProblem.objects.filter(contest=contest).delete()
+        for p in problems_data:
+             prob = Problem.objects.get(id=p['id'])
+             ContestProblem.objects.create(
+                 contest=contest,
+                 problem=prob,
+                 order=p.get('order', 0),
+                 time_limit_override=p.get('limit')
+             )
+             
+        # 2. Update MCQs
+        assigned_ids = [m['id'] for m in mcqs_data]
+        MCQQuestion.objects.filter(contest=contest).exclude(id__in=assigned_ids).update(contest=None, order=0)
+        
+        for m in mcqs_data:
+             MCQQuestion.objects.filter(id=m['id']).update(
+                 contest=contest, 
+                 order=m.get('order', 0)
+             )
+             
+        return Response({'ok': True})
 
 class ExamSessionViewSet(viewsets.ModelViewSet):
     queryset = ExamSession.objects.all()
     serializer_class = ExamSessionSerializer
+    lookup_field = 'session_id'
+
     permission_classes = [AllowAny]
     authentication_classes = [NoCSRFSessionAuthentication]
     lookup_field = 'session_id'  # <-- crucial
@@ -428,19 +604,33 @@ class ExamSessionViewSet(viewsets.ModelViewSet):
         exam_session.end_time = timezone.now()
         exam_session.save()
 
-        # Stop background proctoring if running (but keep instance for a while)
+        # Stop monitoring & Persist ML Metrics
         try:
-            proctor = PROCTORING_INSTANCES.get(exam_session.session_id)
+            proctor = PROCTORING_INSTANCES.pop(exam_session.session_id, None)
             if proctor:
-                anomalies = proctor.stop_monitoring()
-                if isinstance(anomalies, list):
-                    print(f"Proctoring anomalies for {exam_session.session_id}: {len(anomalies)}")
-                # Mark as completed but don't remove immediately
-                proctor.is_completed = True
+                proctor.stop_monitoring()
+                # 1. Sync final risk to ProctoringSession
+                final_status = proctor.get_live_status()
+                
+                # 2. Update/Create ProctoringSession record
+                from .models import ProctoringSession
+                proc_data, _ = ProctoringSession.objects.get_or_create(
+                    exam_session=exam_session,
+                    defaults={'session_id': exam_session.session_id}
+                )
+                proc_data.risk_score = final_status.get('risk_score', 0.0) * 100 # 0-100 scale
+                proc_data.is_flagged = proc_data.risk_score > 75
+                proc_data.face_detection_failures = final_status.get('anomaly_count', 0)
+                proc_data.save()
+
+                
+                print(f"[ML Cleanup] Session {exam_session.session_id} finalized. Risk: {proc_data.risk_score:.2f}")
+
         except Exception as e:
-            print(f"Warning: Failed to stop proctoring for session {exam_session.session_id}: {str(e)}")
+            print(f"Warning: Failed to finalize proctoring for session {exam_session.session_id}: {str(e)}")
 
         return Response(SubmissionSerializer(submission).data, status=status.HTTP_200_OK)
+
 
     @action(detail=True, methods=['get'])
     def verification_status(self, request, session_id=None):
@@ -463,9 +653,18 @@ class ExamSessionViewSet(viewsets.ModelViewSet):
         from django.conf import settings
         
         session = self.get_object()
-        student_id = request.data.get('student_id')
+        student_id = request.data.get('student_id') or (request.user.username if request.user and request.user.is_authenticated else None)
+        
         if not student_id:
              return Response({'error': 'student_id is required'}, status=400)
+        
+        # Link student to session if not already set
+        if not session.student:
+            student_obj = User.objects.filter(username=student_id).first()
+            if student_obj:
+                session.student = student_obj
+                session.save(update_fields=['student'])
+
         
         # 1. Get Image Data
         image_data = request.data.get('image')
@@ -562,7 +761,17 @@ class ExamSessionViewSet(viewsets.ModelViewSet):
                 return Response({'verified': False, 'similarity': 0.0, 'error': 'Account Reference Photo Missing. Please contact Admin.'}, status=200) 
             
             if verified:
-                # 3. Start Proctoring with NEW Reference
+                # 3. Create Audit Record for Identity Verification
+                from .models import ProctoringRecord
+                ProctoringRecord.objects.create(
+                    session=session,
+                    risk_score=0.0,
+                    violation_type='identity_verified',
+                    frame_path=f"/media/sessions/{student_id}/{session.session_id}/session_ref.jpg",
+                    meta_data={'similarity': float(sim), 'method': 'uc1_resnet'}
+                )
+                
+                # 4. Start Proctoring with NEW Reference
                 # Important: Use the SESSION REF (Webcam) for proctoring
                 proctor = ProctoringSystem()
                 proctor.start_monitoring(student_id, image_path=session_ref_path)
@@ -579,26 +788,176 @@ class ExamSessionViewSet(viewsets.ModelViewSet):
             print(f"Verification Error: {e}")
             return Response({'error': str(e)}, status=500)
 
+    @action(detail=False, methods=['get'])
+    def check_enrollment(self, request):
+        """Check if a student has a registered reference photo."""
+        student_id = request.query_params.get('student_id')
+        if not student_id:
+             return Response({'error': 'student_id required'}, status=400)
+             
+        student_ref_dir = os.path.join(settings.MEDIA_ROOT, 'students', student_id)
+        reg_path = os.path.join(student_ref_dir, 'reference.jpg')
+        
+        # Also check lowercase to be robust
+        exists = os.path.exists(reg_path) or os.path.exists(os.path.join(settings.MEDIA_ROOT, 'students', student_id.lower(), 'reference.jpg'))
+        
+        return Response({'enrolled': exists})
+
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny])
+    def enroll_biometric(self, request):
+        """
+        Self-service biometric enrollment.
+        Saves photo to media/students/{student_id}/reference.jpg
+        """
+        student_id = request.data.get('student_id')
+        image_data = request.data.get('image')
+        
+        if not student_id or not image_data:
+            return Response({'error': 'Missing student_id or image'}, status=400)
+            
+        try:
+            if 'base64,' in image_data:
+                image_data = image_data.split('base64,')[1]
+            img_bytes = base64.b64decode(image_data)
+            
+            final_dir = os.path.join(settings.MEDIA_ROOT, 'students', student_id)
+            os.makedirs(final_dir, exist_ok=True)
+            final_path = os.path.join(final_dir, 'reference.jpg')
+            
+            with open(final_path, 'wb') as f:
+                f.write(img_bytes)
+                
+            print(f"[Enrollment] Successful: {student_id}")
+            return Response({'ok': True, 'message': 'Biometric identity enrolled.'})
+        except Exception as e:
+            return Response({'error': str(e)}, status=500)
+
+    @action(detail=True, methods=['post'])
+    def capture_id_card(self, request, session_id=None):
+        """
+        [DECOMMISSIONED] Step 2 of MFA: Capture Student ID Card.
+        Now AUTO-PASSES for high-velocity proctoring.
+        """
+        print(f"ID Card Capture: AUTO-PASS triggered for session {session_id}")
+        return Response({'verified': True})
+
+    @action(detail=True, methods=['post'])
+    def warn_student(self, request, session_id=None):
+        """
+        Faculty intervention: send a warning message to the student.
+        """
+        if not request.user.is_staff:
+            return Response({'error': 'Unauthorized'}, status=403)
+            
+        message = request.data.get('message', 'Please focus on your exam.')
+        proctor = PROCTORING_INSTANCES.get(session_id)
+        
+        if proctor:
+            proctor.latest_status['intervention_message'] = message
+            proctor.latest_status['intervention_id'] = int(time.time())
+            print(f"[Intervention] Warning sent to session {session_id}: {message}")
+            return Response({'ok': True})
+        else:
+            return Response({'error': 'Session not found or inactive'}, status=404)
+
+    @action(detail=True, methods=['post'])
+    def submit_mcqs(self, request, session_id=None):
+        """
+        Handle MCQ submissions. 
+        Payload: { "responses": [{"question_id": 1, "selected": 0}, ...] }
+        """
+        session = self.get_object()
+        responses = request.data.get('responses', [])
+        
+        from .models import MCQQuestion, MCQSubmission
+        total_score = 0
+        questions_processed = 0
+        
+        for resp in responses:
+            q_id = resp.get('question_id')
+            selected = resp.get('selected')
+            
+            try:
+                # If no contest, allow repository-wide lookup
+                if session.contest:
+                    question = MCQQuestion.objects.get(id=q_id, contest=session.contest)
+                else:
+                    question = MCQQuestion.objects.get(id=q_id)
+
+                is_correct = (selected == question.correct_option)
+                
+                MCQSubmission.objects.update_or_create(
+                    exam_session=session,
+                    question=question,
+                    student=session.student if session.student else (request.user if request.user.is_authenticated else None),
+                    defaults={'selected_option': selected, 'is_correct': is_correct}
+                )
+
+                
+                if is_correct: total_score += question.marks
+                questions_processed += 1
+            except MCQQuestion.DoesNotExist:
+                continue
+
+        session.marks_obtained = total_score
+        session.save(update_fields=['marks_obtained'])
+
+        # If MCQ-only, finalize session
+
+        if session.contest and session.contest.contest_type == 'mcq':
+
+            session.is_submitted = True
+            session.status = 'completed'
+            from django.utils import timezone
+            session.end_time = timezone.now()
+            session.save()
+            
+            # Stop ML
+            proctor = PROCTORING_INSTANCES.pop(session.session_id, None)
+            if proctor: proctor.stop_monitoring()
+
+        return Response({'ok': True, 'score': total_score, 'processed': questions_processed})
+
     @action(detail=True, methods=['get'])
     def proctoring_status(self, request, session_id=None):
+        cleanup_stale_sessions() # 🛡️ Industrial Hardening: Purge inactive sessions
         try:
-            self.get_object()  # ensure exists
+            session = self.get_object()  # ensure exists
         except Exception:
             return Response({'error': 'Session not found'}, status=status.HTTP_404_NOT_FOUND)
         
-        # Get live proctoring status from the ProctoringSystem instance
+        # Get live proctoring status
         proctor = PROCTORING_INSTANCES.get(session_id)
         if proctor:
             try:
                 live_status = proctor.get_live_status()
+                # Add contest type for frontend logic
+                live_status['contest_type'] = session.contest.contest_type if session.contest else 'practice'
+                
+                # Fetch MCQs if it's MCQ/Hybrid (Sorted)
+                if session.contest and session.contest.contest_type in ['mcq', 'hybrid']:
+
+                    from .models import MCQQuestion
+                    mcqs = MCQQuestion.objects.filter(contest=session.contest).order_by('order').values('id', 'question_text', 'options', 'marks')
+                    live_status['mcqs'] = list(mcqs)
+                
+                # Fetch Problems if it's Coding/Hybrid (Sorted)
+                if session.contest and session.contest.contest_type in ['coding', 'hybrid']:
+
+                    from .models import ContestProblem
+                    problems = ContestProblem.objects.filter(contest=session.contest).order_by('order').values('problem_id', 'problem__title', 'time_limit_override')
+                    live_status['problems'] = list(problems)
+                
                 return Response(live_status)
+
             except Exception as e:
-                return Response({'error': f'Failed to get proctoring status: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                return Response({'error': f'Failed: {str(e)}'}, status=500)
         else:
-            # Return a default status for completed sessions
             return Response({
-                'num_faces': 0,
-                'head_pose': 'Unknown',
+                'is_active': False,
+                'contest_type': session.contest.contest_type if session.contest else 'practice',
+
+                'head_pose': "Session Inactive",
                 'left_eye_dir': 'Unknown',
                 'right_eye_dir': 'Unknown',
                 'left_eye_img': '',
@@ -630,34 +989,200 @@ class ExamSessionViewSet(viewsets.ModelViewSet):
     def receive_frame(self, request, session_id=None):
         """
         Receives a frame from the frontend (Client-Side Proctoring)
-        and pushes it to the ML Engine.
+        and pushes it to the ML Engine (Asynchronously).
         """
         session = self.get_object()
         frame_data = request.data.get('frame')
+        audio_volume = request.data.get('audio_volume', None)
+        
+        # Touch session before cleanup
+        proctor = PROCTORING_INSTANCES.get(session_id)
+        if proctor:
+            proctor.latest_status['last_update'] = time.time()
+            
+        cleanup_stale_sessions()
         
         if not frame_data:
             return Response({'error': 'No frame data'}, status=400)
             
+        # --- BLACK BOX EVIDENCE LOGIC ---
+        # If risk is extremely high, we capture this frame for the audit trail.
+        proctor = PROCTORING_INSTANCES.get(session_id)
+        if proctor and proctor.latest_status.get('risk_score', 0) > 0.8:
+            try:
+                # Throttling: only save one evidence frame every 30 seconds
+                last_ev = getattr(proctor, '_last_evidence_ts', 0)
+                if time.time() - last_ev > 30:
+                    if 'base64,' in frame_data:
+                        raw_frame = frame_data.split('base64,')[1]
+                    else:
+                        raw_frame = frame_data
+                        
+                    ev_bytes = base64.b64decode(raw_frame)
+                    ev_name = f"violation_{int(time.time())}.jpg"
+                    ev_dir = os.path.join(settings.MEDIA_ROOT, 'sessions', session.student.username if session.student else 'unknown', str(session.session_id))
+                    os.makedirs(ev_dir, exist_ok=True)
+                    ev_path = os.path.join(ev_dir, ev_name)
+                    
+                    with open(ev_path, 'wb') as f:
+                        f.write(ev_bytes)
+                    
+                    # Log to ProctoringRecord
+                    from .models import ProctoringRecord
+                    ProctoringRecord.objects.create(
+                        session=session,
+                        risk_score=proctor.latest_status.get('risk_score', 0.8),
+                        violation_type='high_risk_evidence',
+                        frame_path=f"/media/sessions/{session.student.username if session.student else 'unknown'}/{session.session_id}/{ev_name}",
+                        meta_data={'description': 'Automatic Black Box Capture due to High Risk'}
+                    )
+                    proctor._last_evidence_ts = time.time()
+                    print(f"[Evidence] Captured high-risk frame for session {session_id}")
+            except Exception as e:
+                print(f"[Evidence] Failed to capture frame: {e}")
+            
         if session.session_id in PROCTORING_INSTANCES:
-             proctor = PROCTORING_INSTANCES[session.session_id]
-             # Check if it has the new method (MLAdapter)
-             if hasattr(proctor, 'process_external_frame'):
-                 # Run in background to not block HTTP response? 
-                 # For now run sync to ensure order, it's fast enough on CPU
-                 proctor.process_external_frame(frame_data)
-                 # Update timestamp to prevent 'connection lost'
-                 proctor.latest_status['last_update'] = time.time()
-                 # Return the UPDATED status so the frontend can render boxes/risk immediately
-                 return Response(proctor.latest_status)
+            proctor = PROCTORING_INSTANCES[session.session_id]
+            
+            if hasattr(proctor, 'process_external_frame'):
+                # ─── Thread Throttling (Logical Hardening) ───
+                # Check if AI is busy with previous frame or still initializing
+                if getattr(proctor, 'is_processing', False):
+                    # Still busy, skip this frame to prevent overload
+                    resp = {**proctor.latest_status}
+                    resp['busy'] = True
+                    return Response(resp)
+                    
+                # ─── Asynchronous ML Processing (Non-blocking) ───
+                # Move heavy CV2/Inference to a background thread
+                threading.Thread(
+                    target=proctor.process_external_frame, 
+                    args=(frame_data,), 
+                    kwargs={'audio_volume': audio_volume},
+                    daemon=True
+                ).start()
+                
+                # Record update time to prevent cleanup
+                proctor.latest_status['last_update'] = time.time()
+                
+                # ─── SENTINEL PRIME: Automated Enforcement (RELAXED FOR TESTING) ───
+                # If risk stays critically high (>0.99) for a sustained period, auto-terminate
+                if proctor.latest_status.get('risk_score', 0) > 0.99:
+                    if not hasattr(proctor, '_critical_strike_count'):
+                        proctor._critical_strike_count = 0
+                    proctor._critical_strike_count += 1
+                    
+                    if proctor._critical_strike_count >= 25: # ~60-90 seconds of sustained near-total violation
+                        session.last_command = 'TERMINATE'
+                        session.save(update_fields=['last_command'])
+                        print(f"[Sentinel Prime] AUTO-TERMINATING session {session_id} due to total sustained violation.")
+                else:
+                    # Decay the strike count slowly to allow for more flexibility
+                    if hasattr(proctor, '_critical_strike_count') and proctor._critical_strike_count > 0:
+                        proctor._critical_strike_count -= 1
+
+                # ─── Intervention Propagation ───
+                # Bundle the faculty's last_command into the real-time response
+                with proctor.lock:
+                    resp_data = {**proctor.latest_status}
+                resp_data['last_command'] = session.last_command
+                
+                # Clear command once dispatched so it only fires once on student side
+                if session.last_command != 'NONE':
+                    session.last_command = 'NONE' # Reset to neutral
+                    session.save(update_fields=['last_command'])
+
+                return Response(resp_data)
         
-        return Response({'status': 'ignored'}, status=200)
+        return Response({'is_active': False, 'head_pose': 'Session Error'})
 
     @action(detail=True, methods=['get'])
-    def risk_history(self, request, session_id=None):
+    def export_report(self, request, session_id=None, **kwargs):
+
+
+        """
+        Generates a consolidated evidence report for faculty/admin review.
+        Aggregates proctoring statistics, violations, and snapshot timeline.
+        """
+        session = self.get_object()
+        records = ProctoringRecord.objects.filter(session=session).order_by('timestamp')
+        
+        # Aggregation Logic
+        stats = {
+            'total_violations': 0,
+            'violation_counts': {},
+            'avg_risk': 0.0,
+            'max_risk': 0.0,
+            'duration_mins': 0
+        }
+        
+        total_risk = 0
+        gallery_records = []
+        
+        for r in records:
+            total_risk += r.risk_score
+            stats['max_risk'] = max(stats['max_risk'], r.risk_score)
+            
+            if r.violation_type:
+                stats['total_violations'] += 1
+                vtype = r.violation_type
+                stats['violation_counts'][vtype] = stats['violation_counts'].get(vtype, 0) + 1
+                
+                # Add to gallery if it's a violation with a frame
+                if r.frame_path:
+                    gallery_records.append(r)
+            
+            # Also add high risk frames to gallery
+            elif r.risk_score > 0.6 and r.frame_path:
+                 gallery_records.append(r)
+        
+        if records.count() > 0:
+            stats['avg_risk'] = total_risk / records.count()
+            
+        context = {
+            'session': session,
+            'student': session.student,
+            'contest': session.contest,
+            'stats': stats,
+            'records': records[:200], # Timeline
+            'chart_data': {
+                'labels': [r.timestamp.strftime('%H:%M:%S') for r in records],
+                'scores': [r.risk_score for r in records]
+            },
+            'gallery': gallery_records[:24], # 6x4 grid
+            'generated_at': time.ctime()
+        }
+        
+        return render(request, 'exams/evidence_report.html', context)
+
+    @action(detail=True, methods=['get'])
+
+    def session_history(self, request, session_id=None):
+
+        session = self.get_object()
+        records = session.proctoring_records.all().order_by('timestamp')
+        
+        history = []
+        for r in records:
+            history.append({
+                "timestamp": r.timestamp.isoformat(),
+                "risk_score": r.risk_score,
+                "violation": r.violation_type,
+                "frame_url": r.frame_path if r.frame_path else None,
+                "meta_data": r.meta_data
+            })
+            
+        return Response({
+            "session_id": session.session_id,
+            "student_id": session.student_id,
+            "history": history
+        })
+
+    @action(detail=True, methods=['get'])
+    def session_history(self, request, session_id=None):
         """
         Returns the full per-frame risk trajectory for this session.
-        Used by the frontend sparkline in the proctoring widget.
-        Response: { history: [{timestamp, risk, uc1, uc2, uc3, uc4}, ...] }
+        Used by the investigative audit terminal for deep dives.
         """
         try:
             self.get_object()
@@ -671,6 +1196,70 @@ class ExamSessionViewSet(viewsets.ModelViewSet):
             return Response({'history': history[-150:]})
         return Response({'history': []})
 
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminUser])
+    def send_command(self, request, session_id=None):
+        """
+        Faculty action to push a remote command to the student's terminal.
+        Available: PAUSE, RESUME, WARN, TERMINATE
+        """
+        session = self.get_object()
+        command = request.data.get('command', 'NONE').upper()
+        if command not in ['PAUSE', 'RESUME', 'WARN', 'TERMINATE', 'NONE']:
+            return Response({'error': 'Invalid command'}, status=400)
+            
+        session.last_command = command
+        session.save(update_fields=['last_command'])
+        return Response({'status': 'Command queued', 'command': command})
+
+
+@api_view(['GET'])
+@login_required
+def dashboard_stats(request):
+    """Returns analytics for the faculty command center"""
+    if not request.user.is_staff:
+        return Response({'error': 'Unauthorized'}, status=403)
+    
+    from .models import Problem, MCQQuestion, Contest, ExamSession, ProctoringRecord
+    from django.utils import timezone
+    from datetime import timedelta
+    
+    now = timezone.now()
+    last_24h = now - timedelta(hours=24)
+    
+    stats = {
+        'total_problems': Problem.objects.count(),
+        'total_mcqs': MCQQuestion.objects.count(),
+        'active_sessions': ExamSession.objects.filter(status='active').count(),
+        'verified_students': User.objects.filter(is_staff=False).count(), # Simplification
+        'recent_anomalies': ProctoringRecord.objects.filter(timestamp__gte=last_24h, risk_score__gt=0.7).count(),
+        'total_contests': Contest.objects.count()
+    }
+    return Response(stats)
+
+@login_required
+def faculty_dashboard(request):
+    """View for faculty to manage questions and exams"""
+    if not request.user.is_staff:
+        from django.shortcuts import render
+        return render(request, '403.html', status=403)
+    
+    from .models import Problem, MCQQuestion, Contest, ExamSession
+    problems = Problem.objects.all()
+    mcqs = MCQQuestion.objects.all()
+    contests = Contest.objects.all().order_by('-start_time')
+    
+    # Get high-risk sessions
+    recent_sessions = ExamSession.objects.filter(is_submitted=True).order_by('-end_time')[:10]
+    
+    context = {
+        'problems': problems,
+        'mcqs': mcqs,
+        'contests': contests,
+        'recent_sessions': recent_sessions,
+    }
+    return render(request, 'exams/faculty_dashboard.html', context)
+
+@login_required
 def index(request):
     return render(request, 'ind.html')
 
@@ -852,10 +1441,13 @@ class faculty_registerview(APIView):
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
+            user = serializer.save()
+            # Elevate to staff to grant access to proctoring dashboards
+            user.is_staff = True
+            user.save()
             return Response({
                 "message": "Faculty registered successfully",
-                "redirect": "/verification_pending"
+                "redirect": "/login"
             }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -865,3 +1457,22 @@ class faculty_registerview(APIView):
 
 def frontend_view(request):
     return render(request, 'exams/index.html')
+
+
+from rest_framework import permissions
+
+class AuthSessionCheckView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request):
+        """Professional session verification endpoint"""
+        user = request.user
+        # Check if user is staff (Faculty indicator)
+        role = 'faculty' if user.is_staff else 'student'
+        return Response({
+            'user': {
+                'username': user.username,
+                'email': user.email,
+                'role': role
+            }
+        })

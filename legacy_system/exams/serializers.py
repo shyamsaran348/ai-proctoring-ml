@@ -2,8 +2,10 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.contrib.auth.hashers import make_password
 from .models import (
-    Problem, TestCase, ExamSession, Submission, TestResult, Language, ProblemLanguage, UserProfile
+    Problem, TestCase, ExamSession, Submission, TestResult, Language, ProblemLanguage, UserProfile,
+    MCQQuestion, MCQSubmission, Contest
 )
+
 from django.conf import settings
 import os
 
@@ -93,19 +95,41 @@ class TestCaseSerializer(serializers.ModelSerializer):
 
 
 class ProblemSerializer(serializers.ModelSerializer):
-    test_cases = TestCaseSerializer(many=True, read_only=True)
+    test_cases = TestCaseSerializer(many=True, required=False) # Changed from read_only=True
     # provide an initial_code fallback (JS default). You can expand to per-language later.
-    initial_code = serializers.SerializerMethodField()
-    language_specific_code = serializers.SerializerMethodField()
-    time_limit = serializers.IntegerField(source='time_limit_seconds', read_only=True)
+    initial_code = serializers.SerializerMethodField(read_only=True)
+    language_specific_code = serializers.SerializerMethodField(read_only=True)
+    time_limit = serializers.IntegerField(source='time_limit_seconds', required=False)
 
     class Meta:
         model = Problem
         fields = [
             'id', 'title', 'description', 'problem_statement', 'input_format', 'output_format',
             'constraints', 'sample_input', 'sample_output', 'explanation',
-            'difficulty', 'points', 'time_limit', 'test_cases', 'initial_code', 'language_specific_code'
+            'difficulty', 'points', 'time_limit', 'test_cases', 'initial_code', 'language_specific_code',
+            'time_limit_seconds'
         ]
+        extra_kwargs = {'time_limit_seconds': {'write_only': True, 'required': False}}
+
+    def create(self, validated_data):
+        test_cases_data = validated_data.pop('test_cases', [])
+        problem = Problem.objects.create(**validated_data)
+        for tc_data in test_cases_data:
+            TestCase.objects.create(problem=problem, **tc_data)
+        return problem
+
+    def update(self, instance, validated_data):
+        test_cases_data = validated_data.pop('test_cases', None)
+        instance = super().update(instance, validated_data)
+        
+        if test_cases_data is not None:
+            # Simple sync: delete old and create new (or match by ID if we want to be fancy)
+            instance.test_cases.all().delete()
+            for tc_data in test_cases_data:
+                TestCase.objects.create(problem=instance, **tc_data)
+        
+        return instance
+
 
     def get_initial_code(self, obj):
         # Try to find a ProblemLanguage starter code for javascript, else fallback
@@ -209,3 +233,19 @@ class CodeExecutionResponseSerializer(serializers.Serializer):
     results = serializers.ListField(child=serializers.DictField())
     execution_time = serializers.FloatField()
     error_message = serializers.CharField(required=False)
+class MCQQuestionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MCQQuestion
+        fields = ['id', 'contest', 'question_text', 'options', 'correct_option', 'marks', 'order', 'created_at']
+        read_only_fields = ['created_at']
+
+class ContestSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Contest
+        fields = [
+            'id', 'title', 'description', 'rules', 'start_time', 'end_time', 
+            'duration_minutes', 'status', 'contest_type', 'visibility',
+            'enable_proctoring', 'require_webcam', 'require_microphone', 'lock_browser',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']

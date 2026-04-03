@@ -581,6 +581,36 @@
       color: #991b1b;
     }
 
+    /* Safe-Zone Pulse Animations */
+    @keyframes pulse-orange {
+      0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+      70% { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+    }
+    @keyframes pulse-red {
+      0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+      70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
+    .pulse-orange { animation: pulse-orange 2s infinite; border-color: #f59e0b !important; }
+    .pulse-red { animation: pulse-red 1.5s infinite; border-color: #ef4444 !important; }
+    
+    .intervention-alert {
+        position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(239, 68, 68, 0.9); color: white;
+        display: none; flex-direction: column; align-items: center; justify-content: center;
+        text-align: center; padding: 20px; z-index: 100;
+        backdrop-filter: blur(4px);
+    }
+    .intervention-msg { font-size: 14px; font-weight: 700; margin-bottom: 12px; }
+
+    .safe-zone-hint {
+        position: absolute; top: -30px; left: 0; width: 100%;
+        background: rgba(15, 23, 42, 0.9); color: white;
+        font-size: 10px; font-weight: 700; text-align: center;
+        padding: 4px; border-radius: 6px; display: none;
+    }
+
     /* Verification Modal (Redesign) */
     .modal-overlay {
       position: fixed;
@@ -808,7 +838,88 @@
       cursor: default;
       /* Not clickable to dismiss, must fix issue */
     }
-  </style>
+
+    /* MCQ Styles */
+
+        .mcq-container {
+            display: none;
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            margin-top: 20px;
+        }
+
+        .mcq-question {
+            margin-bottom: 30px;
+            padding: 20px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .mcq-text {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 16px;
+        }
+
+        .mcq-options {
+            display: grid;
+            gap: 12px;
+        }
+
+        .mcq-option {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .mcq-option:hover {
+            border-color: #6366f1;
+            background: #f8fafc;
+        }
+
+        .mcq-option.selected {
+            border-color: #4f46e5;
+            background: #eef2ff;
+        }
+
+        .mcq-option input {
+            margin-right: 12px;
+            width: 18px;
+            height: 18px;
+        }
+
+        .mcq-submit-btn {
+            background: #4f46e5;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            float: right;
+            margin-top: 20px;
+        }
+
+        .mcq-submit-btn:hover {
+            opacity: 0.9;
+        }
+
+        /* Split View for Hybrid */
+        .hybrid-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+    </style>
+
+
 </head>
 
 <body>
@@ -855,76 +966,88 @@
       <p class="dashboard-subtitle">Select a challenge to demonstrate your skills.</p>
     </div>
     <div id="problems-grid" class="grid">
-      <!-- Problem Cards will be injected here -->
-    </div>
-  </main>
-
-  <!-- EXAM WORKSPACE (Hidden initially) -->
-  <div id="exam-section" class="workspace hidden">
-
-    <!-- Left: Problem -->
-    <div class="panel-left">
-      <div class="problem-content">
-        <h2 id="problem-title">Problem Title</h2>
-        <p id="problem-statement" style="line-height: 1.7; color: var(--text-secondary);">
-          Loading description...
-        </p>
-
-        <div class="section-title">Input Format</div>
-        <div id="problem-input" class="data-block"></div>
-
-        <div class="section-title">Output Format</div>
-        <div id="problem-output" class="data-block"></div>
-
-        <div class="section-title">Constraints</div>
-        <div id="problem-constraints" class="data-block"></div>
-      </div>
+     <!-- EXAM WORKSPACE (Hidden initially) -->
+  <div id="exam-section" class="workspace hidden" style="display: grid; grid-template-rows: auto 1fr; height: 100vh;">
+    
+    <!-- Tab Navigation -->
+    <div id="exam-tabs" class="exam-tabs" style="display:flex; background: #ffffff; border-bottom: 1px solid #e2e8f0; padding: 0 24px; gap: 32px; height: 56px; align-items: stretch; z-index: 10;">
+        <button id="tab-coding" class="exam-tab active" onclick="switchTab('coding')" style="background:none; border:none; border-bottom: 2px solid #4f46e5; color: #4f46e5; font-weight: 600; cursor: pointer; display: flex; align-items: center; padding: 0 4px;">Coding Task</button>
+        <button id="tab-mcq" class="exam-tab" onclick="switchTab('mcq')" style="background:none; border:none; border-bottom: 2px solid transparent; color: #64748b; font-weight: 500; cursor: pointer; display: flex; align-items: center; padding: 0 4px;">Multiple Choice</button>
     </div>
 
-    <!-- Right: Editor -->
-    <div class="panel-right">
-      <div class="editor-toolbar">
-        <div class="flex items-center gap-4">
-          <span style="font-size: 13px; font-weight: 600; color: var(--text-secondary);">SOLUTION.JS</span>
-          <select id="language" class="select-lang" onchange="changeLanguage()">
-            <option value="javascript">JavaScript</option>
-            <option value="python">Python</option>
-          </select>
+    <div id="coding-workspace" style="display: grid; grid-template-columns: 1fr 1fr; height: calc(100vh - 56px - 64px);">
+        <!-- Left: Problem -->
+        <div class="panel-left" style="overflow-y: auto; padding: 32px; border-right: 1px solid #e2e8f0;">
+            <div id="problem-input" style="background: #f8fafc; padding: 12px; border-radius: 6px; font-family: monospace; font-size: 13px; margin-bottom: 24px;"></div>
+    
+            <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.05em; margin-bottom: 8px;">Output Format</div>
+            <div id="problem-output" style="background: #f8fafc; padding: 12px; border-radius: 6px; font-family: monospace; font-size: 13px; margin-bottom: 24px;"></div>
+    
+            <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.05em; margin-bottom: 8px;">Constraints</div>
+            <div id="problem-constraints" style="background: #f8fafc; padding: 12px; border-radius: 6px; font-family: monospace; font-size: 13px; margin-bottom: 24px;"></div>
+          </div>
         </div>
-        <div class="timer-display">
-          <span>⏱️</span>
-          <span id="timer">00:00</span>
+    
+        <!-- Right: Editor -->
+        <div class="panel-right" style="display: flex; flex-direction: column; background: #ffffff;">
+          <div style="height: 48px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; border-bottom: 1px solid #f1f5f9;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <span style="font-size: 11px; font-weight: 700; color: #94a3b8;">SOLUTION.PY</span>
+              <select id="language" onchange="changeLanguage()" style="font-size: 12px; border: 1px solid #e2e8f0; border-radius: 4px; padding: 2px 8px;">
+                <option value="python">Python 3</option>
+                <option value="javascript">JavaScript</option>
+              </select>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; color: #475569; font-weight: 600;">
+              <span>⏱️</span>
+              <span id="timer">00:00</span>
+            </div>
+          </div>
+    
+          <!-- Editor Container -->
+          <div id="editor-container" style="flex: 1; overflow: hidden;"></div>
+          <textarea id="editor" style="display: none;"></textarea>
+    
+          <!-- Output Console -->
+          <div id="output-panel" style="height: 200px; display: flex; flex-direction: column; border-top: 1px solid #e2e8f0;">
+            <div style="height: 32px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; padding: 0 16px; display: flex; align-items: center; font-size: 11px; font-weight: 700; color: #94a3b8;">CONSOLE</div>
+            <div id="output" style="flex: 1; overflow-y: auto; padding: 12px; font-family: monospace; font-size: 12px; color: #1e293b;">Run code to see output...</div>
+            <div id="test-results" style="padding: 0 16px 16px; font-size: 12px;"></div>
+          </div>
+    
+          <!-- Bottom Actions -->
+          <div style="height: 64px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; border-top: 1px solid #e2e8f0; background: #ffffff;">
+            <button onclick="toggleConsole()" style="background: none; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 16px; font-size: 13px; cursor: pointer;">Toggle Console</button>
+            <div style="display: flex; gap: 12px;">
+              <button onclick="runCode()" style="background: #f1f5f9; border: none; border-radius: 6px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer;">▶ Run Code</button>
+              <button onclick="submitCode()" style="background: #4f46e5; border: none; border-radius: 6px; padding: 8px 24px; font-size: 13px; font-weight: 600; color: #ffffff; cursor: pointer;">Submit Solution</button>
+            </div>
+          </div>
         </div>
-      </div>
-
-      <!-- Editor Container -->
-      <div id="editor-container"></div>
-      <textarea id="editor" style="display: none;"></textarea>
-
-      <!-- Output Console (Toggled) -->
-      <div id="output-panel">
-        <div class="console-header">Console Output</div>
-        <div id="output" class="console-content">Run your code to see results here...</div>
-        <!-- Test Results will also go here -->
-        <div id="test-results" style="padding: 0 16px 16px; font-size: 13px;"></div>
-      </div>
-
-      <!-- Bottom Actions -->
-      <div class="action-bar">
-        <button class="btn btn-outline" onclick="toggleConsole()">Toggle Console</button>
-        <div class="flex gap-4">
-          <button class="btn btn-outline" onclick="runCode()">▶ Run Code</button>
-          <button class="btn btn-primary" onclick="submitCode()">Submit Solution</button>
-        </div>
-      </div>
     </div>
 
+    <!-- MCQ Workspace -->
+    <div id="mcq-workspace" style="display:none; height: calc(100vh - 56px - 64px); background: #f8fafc; overflow-y: auto; padding: 48px;">
+        <div id="mcq-list" style="max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px;">
+            <!-- MCQs will be injected here -->
+        </div>
+        <div style="max-width: 800px; margin: 40px auto; display: flex; justify-content: flex-end;">
+            <button class="mcq-submit-btn" onclick="submitMCQs()" style="background: #4f46e5; color: white; border: none; padding: 12px 32px; border-radius: 8px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.4);">Finalize MCQ Submission</button>
+        </div>
+    </div>
     <!-- Proctoring Floating Widget -->
     <div id="proctoring-panel" class="proctor-widget">
       <div class="proctor-header">
+
         <div class="proctor-title">
           <div id="status-dot" class="status-dot"></div>
           <span id="proctoring-status-text">Initializing...</span>
+          <div id="safe-zone-hint" class="safe-zone-hint">STAY CENTERED</div>
+        </div>
+        <div id="intervention-alert" class="intervention-alert">
+            <div style="font-size: 24px; margin-bottom: 8px;">⚠️</div>
+            <div id="intervention-msg" class="intervention-msg">FACULTY WARNING</div>
+            <button class="btn btn-outline" style="background:white; color:var(--danger); border:none;" onclick="ackIntervention()">Acknowledge</button>
         </div>
         <div class="flex gap-2">
           <button onclick="toggleProctorHelp()"
@@ -1046,7 +1169,113 @@
       <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/edit/closebrackets.min.js"></script>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/edit/matchbrackets.min.js"></script>
       <script>
-        // --- Global State ---
+        // --- MCQ & Tab Logic ---
+
+        let mcqsLoaded = false;
+
+        function switchTab(tab) {
+          const codingTab = document.getElementById('tab-coding');
+          const mcqTab = document.getElementById('tab-mcq');
+          const codingWorkspace = document.getElementById('coding-workspace');
+          const mcqWorkspace = document.getElementById('mcq-workspace');
+
+          if (tab === 'coding') {
+            codingWorkspace.style.display = 'grid';
+            mcqWorkspace.style.display = 'none';
+            codingTab.classList.add('active');
+            codingTab.style.borderBottomColor = '#4f46e5';
+            codingTab.style.color = '#4f46e5';
+            mcqTab.classList.remove('active');
+            mcqTab.style.borderBottomColor = 'transparent';
+            mcqTab.style.color = '#64748b';
+          } else {
+            codingWorkspace.style.display = 'none';
+            mcqWorkspace.style.display = 'block';
+            mcqTab.classList.add('active');
+            mcqTab.style.borderBottomColor = '#4f46e5';
+            mcqTab.style.color = '#4f46e5';
+            codingTab.classList.remove('active');
+            codingTab.style.borderBottomColor = 'transparent';
+            codingTab.style.color = '#64748b';
+          }
+        }
+
+        function renderMCQs(mcqs) {
+          if (!mcqs || mcqs.length === 0 || mcqsLoaded) return;
+          const mcqList = document.getElementById('mcq-list');
+          mcqList.innerHTML = '';
+
+          mcqs.forEach((q, idx) => {
+            const qDiv = document.createElement('div');
+            qDiv.className = 'mcq-question';
+            qDiv.style.background = '#ffffff';
+            qDiv.style.padding = '32px';
+            qDiv.style.border = '1px solid #e2e8f0';
+            qDiv.style.borderRadius = '12px';
+            qDiv.style.marginBottom = '24px';
+
+            let optionsHtml = '';
+            q.options.forEach((opt, optIdx) => {
+              optionsHtml += `
+                <label class="mcq-option" style="display: flex; align-items: center; padding: 16px; border: 1px solid #e2e8f0; border-radius: 8px; cursor: pointer; margin-bottom: 12px; transition: all 0.2s;">
+                  <input type="radio" name="q-${q.id}" value="${optIdx}" style="width: 18px; height: 18px; margin-right: 12px; accent-color: #4f46e5;">
+                  <span style="font-size: 15px; color: #1e293b;">${opt}</span>
+                </label>
+              `;
+            });
+
+            qDiv.innerHTML = `
+              <div style="font-size: 13px; font-weight: 700; color: #94a3b8; margin-bottom: 8px;">QUESTION ${idx + 1}</div>
+              <div class="mcq-text" style="font-size: 18px; font-weight: 600; color: #0f172a; margin-bottom: 24px;">${q.question_text}</div>
+              <div class="mcq-options">${optionsHtml}</div>
+            `;
+            mcqList.appendChild(qDiv);
+          });
+          mcqsLoaded = true;
+          
+          // Add hover effects via JS for better UX
+          document.querySelectorAll('.mcq-option').forEach(el => {
+            el.addEventListener('click', () => {
+              el.parentElement.querySelectorAll('.mcq-option').forEach(sib => {
+                 sib.style.borderColor = '#e2e8f0';
+                 sib.style.background = '#ffffff';
+              });
+              el.style.borderColor = '#4f46e5';
+              el.style.background = '#f5f7ff';
+            });
+          });
+        }
+
+        async function submitMCQs() {
+          if (!confirm("Are you sure you want to finalize your MCQ responses? This cannot be undone.")) return;
+          
+          const responses = [];
+          document.querySelectorAll('.mcq-question').forEach(qDiv => {
+            const qId = qDiv.querySelector('input[type="radio"]').name.split('-')[1];
+            const selected = qDiv.querySelector('input[type="radio"]:checked');
+            if (selected) {
+              responses.push({ question_id: parseInt(qId), selected: parseInt(selected.value) });
+            }
+          });
+
+          try {
+            const r = await fetch(`/api/sessions/${currentSession.session_id}/submit_mcqs/`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ responses })
+            });
+            const res = await r.json();
+            if (res.ok) {
+              alert(`MCQs Submitted! You processed ${res.processed} questions.`);
+              if (currentSession.contest_type === 'mcq') {
+                 goBack(); // or show results
+              }
+            }
+          } catch (e) {
+            alert("Error submitting MCQs");
+          }
+        }
+
         let currentProblem = null;
         let currentSession = null;
         let timerInterval = null;
@@ -1117,12 +1346,22 @@
           </div>
           <p>${p.description ? p.description.substring(0, 80) + '...' : 'No description available.'}</p>
           
-          ${isCompleted
-                ? `<button class="btn btn-outline" disabled>Assessment Completed</button>`
-                : `<button class="btn btn-primary" onclick="startExam(${p.id})">Start Assessment</button>`
-              }
+          <div id="btn-container-${p.id}"></div>
         `;
             grid.appendChild(card);
+            
+            // Render button separately to avoid complex ternary in template string
+            const btnContainer = document.getElementById(`btn-container-${p.id}`);
+            if (isCompleted) {
+              btnContainer.innerHTML = `<button class="btn btn-outline" disabled>Assessment Completed</button>`;
+            } else {
+              const startBtn = document.createElement('button');
+              startBtn.className = 'btn btn-primary';
+              startBtn.innerText = 'Start Assessment';
+              startBtn.onclick = () => startExam(p.id);
+              btnContainer.appendChild(startBtn);
+            }
+
           });
         }
 
@@ -1134,6 +1373,17 @@
             if (!studentId) return;
             localStorage.setItem('student_id', studentId);
           }
+
+          // --- ENROLLMENT CHECK ---
+          try {
+            const enrollRes = await fetch(`/api/sessions/check_enrollment/?student_id=${studentId}`);
+            const enrollData = await enrollRes.json();
+            if (!enrollData.enrolled) {
+               const enrolled = await runEnrollmentWizard(studentId);
+               if (!enrolled) return; // User cancelled or failed
+            }
+          } catch (e) { console.error("Enrollment check failed", e); }
+
 
           // API Call
           try {
@@ -1206,6 +1456,7 @@
             const btn = document.getElementById('v-btn');
 
             let stream = null;
+            let checkLighting = null;
 
             navigator.mediaDevices.getUserMedia({ video: true }).then(s => {
               stream = s;
@@ -1219,52 +1470,41 @@
               lightingStatus.style.fontWeight = 'bold';
               lightingStatus.style.fontSize = '0.9rem';
 
-              // Safer insertion: use the button's own parent
               if (btn && btn.parentNode) {
                 btn.parentNode.insertBefore(lightingStatus, btn);
               }
 
-              const checkLighting = setInterval(() => {
-                // Ensure elements exist before drawing
+              checkLighting = setInterval(() => {
                 if (video && video.readyState === 4 && canvas) {
                   try {
                     const ctx = canvas.getContext('2d');
-                    canvas.width = 100; // Small size for speed
+                    canvas.width = 100;
                     canvas.height = 100;
                     ctx.drawImage(video, 0, 0, 100, 100);
                     const frame = ctx.getImageData(0, 0, 100, 100);
                     const data = frame.data;
-                    let r, g, b, avg;
-                    let colorSum = 0;
+                    let r, g, b, avg, colorSum = 0;
 
                     for (let x = 0, len = data.length; x < len; x += 4) {
-                      r = data[x];
-                      g = data[x + 1];
-                      b = data[x + 2];
+                      r = data[x]; g = data[x + 1]; b = data[x + 2];
                       avg = Math.floor((r + g + b) / 3);
                       colorSum += avg;
                     }
 
                     const brightness = Math.floor(colorSum / (100 * 100));
-
                     if (brightness < 60) {
                       lightingStatus.innerText = "⚠️ Lighting is too DARK. Please add more light.";
-                      lightingStatus.style.color = "#f59e0b"; // Orange
+                      lightingStatus.style.color = "#f59e0b";
                     } else if (brightness > 200) {
                       lightingStatus.innerText = "⚠️ Lighting is too BRIGHT. Avoid backlighting.";
                       lightingStatus.style.color = "#f59e0b";
                     } else {
                       lightingStatus.innerText = "✅ Lighting conditions are GOOD.";
-                      lightingStatus.style.color = "#10b981"; // Green
+                      lightingStatus.style.color = "#10b981";
                     }
-                  } catch (err) {
-                    // Canvas security errors or other glitches shouldn't stop the flow
-                    console.warn("Lighting check failed:", err);
-                  }
+                  } catch (err) { console.warn("Lighting check failed:", err); }
                 }
               }, 500);
-
-              // Helper to cleanup (not called automatically here, relies on verify success)
 
             }).catch(e => {
               console.error("Camera Init Error:", e);
@@ -1274,12 +1514,11 @@
             });
 
             btn.onclick = async () => {
-              btn.disabled = true; // Disable double clicks
-              btn.innerText = "Verifying...";
-              status.innerText = "Processing...";
+              btn.disabled = true;
+              btn.innerText = "⚡ AI Analyzing...";
+              status.innerText = "Matching with registered profile...";
               status.style.color = "var(--primary)";
 
-              // Capture
               canvas.width = 300;
               canvas.height = (video.videoHeight / video.videoWidth) * 300;
               const ctx = canvas.getContext('2d');
@@ -1287,7 +1526,6 @@
               const dataURL = canvas.toDataURL('image/jpeg', 0.85);
 
               try {
-                // USE SERVER-SIDE USERNAME (Trusted)
                 const currentStudentId = "{{ user.username }}";
                 const r = await fetch(`/api/sessions/${sessionId}/verify_face_snapshot/`, {
                   method: 'POST',
@@ -1297,19 +1535,47 @@
                 const res = await r.json();
 
                 if (res.verified) {
-                  status.innerText = "Verified! Redirecting...";
-                  status.style.color = "var(--success)";
-                  setTimeout(() => {
-                    if (stream) stream.getTracks().forEach(t => t.stop());
-                    // Remove interval if exists (it sits in closure scope)
-                    // We don't have direct handle here easily unless we move 'checkLighting' up. 
-                    // But preventing memory leak:
-                    const lightingEl = document.getElementById('v-lighting');
-                    if (lightingEl) lightingEl.remove();
+                   // --- STEP 2: ID CARD SCAN ---
+                   btn.disabled = false;
+                   btn.innerText = "Capture ID Card";
+                   status.innerText = "Step 2: Please hold your Student ID card up to the camera.";
+                   status.style.color = "var(--primary)";
+                   document.querySelector('.modal-icon').innerText = "💳";
+                   document.querySelector('.modal h2').innerText = "Step 2: ID Card Scan";
+                   
+                   btn.onclick = async () => {
+                        btn.disabled = true;
+                        btn.innerText = "Processing ID...";
+                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                        const idDataURL = canvas.toDataURL('image/jpeg', 0.9);
+                        
+                        try {
+                            const r_id = await fetch(`/api/exam-sessions/${sessionId}/capture_id_card/`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ image: idDataURL })
+                            });
+                            const res_id = await r_id.json();
+                            if (res_id.ok) {
+                                if (checkLighting) clearInterval(checkLighting);
+                                status.innerText = "✅ Verification Complete! Launching...";
+                                status.style.color = "var(--success)";
+                                setTimeout(() => {
+                                    if (stream) stream.getTracks().forEach(t => t.stop());
+                                    if (document.getElementById('v-lighting')) document.getElementById('v-lighting').remove();
+                                    document.body.removeChild(overlay);
+                                    resolve(true);
+                                }, 1500);
+                            } else {
+                                throw new Error(res_id.error);
+                            }
+                        } catch (e_id) {
+                            status.innerText = "ID Scan Failed: " + (e_id.message || "Error");
+                            btn.disabled = false;
+                            btn.innerText = "Retry ID Scan";
+                        }
+                   };
 
-                    document.body.removeChild(overlay);
-                    resolve(true);
-                  }, 1000);
                 } else {
                   status.innerText = res.error ? res.error : `Match Failed (Score: ${res.similarity ? res.similarity.toFixed(2) : 0}). Try Again.`;
                   status.style.color = "var(--danger)";
@@ -1376,7 +1642,65 @@
             });
             const data = await res.json();
             updateProctorUI(data); // Call unified updater
+
+            // Handle Multiple Problems Switcher
+            if (data.problems && data.problems.length > 1) {
+                renderProblemSwitcher(data.problems);
+            }
           } catch (e) { }
+        }
+
+        let problemCache = {}; // id -> data
+        let currentProblemId = null;
+
+        function renderProblemSwitcher(problems) {
+            const switcher = document.getElementById('problem-switcher');
+            switcher.classList.remove('hidden');
+            
+            // Only re-render if count or ids changed
+            const pIds = problems.map(p => p.problem_id).join(',');
+            if (switcher.dataset.ids === pIds) return;
+            switcher.dataset.ids = pIds;
+
+            switcher.innerHTML = problems.map((p, idx) => `
+                <button class="btn ${currentProblemId == p.problem_id ? 'btn-primary' : 'btn-outline'} btn-sm" 
+                        onclick="switchProblem('${p.problem_id}')">
+                    Problem ${idx + 1}
+                </button>
+            `).join('');
+        }
+
+        async function switchProblem(id) {
+            if (currentProblemId === id) return;
+            
+            // Save current code
+            if (currentProblemId && editor) {
+                problemCache[currentProblemId] = editor.getValue();
+            }
+
+            currentProblemId = id;
+            
+            // Fetch problem details if not in cache (or just fetch always for fresh data)
+            const res = await fetch(`/api/problems/${id}/`);
+            const p = await res.json();
+            
+            document.getElementById('problem-title').innerText = p.title;
+            document.getElementById('problem-statement').innerText = p.problem_statement;
+            document.getElementById('problem-input').innerText = p.input_format || "N/A";
+            document.getElementById('problem-output').innerText = p.output_format || "N/A";
+            document.getElementById('problem-constraints').innerText = p.constraints || "N/A";
+            
+            // Restore code
+            if (editor) {
+                editor.setValue(problemCache[id] || p.default_code || "// Start coding...");
+            }
+
+            // Refresh Switcher UI
+            const switcher = document.getElementById('problem-switcher');
+            if (switcher.dataset.ids) {
+                const problems = switcher.dataset.ids.split(',').map(id => ({problem_id: id}));
+                renderProblemSwitcher(problems);
+            }
         }
 
         function updateProctorUI(data) {
@@ -1493,6 +1817,33 @@
             }
             if (riskValEl) riskValEl.textContent = risk.toFixed(4);
 
+            // --- Safe-Zone HUD Pulse Logic ---
+            const widget = document.getElementById('proctoring-panel');
+            const hint = document.getElementById('safe-zone-hint');
+            
+            if (widget && hint) {
+                widget.classList.remove('pulse-orange', 'pulse-red');
+                hint.style.display = 'none';
+                
+                if (data.num_faces === 0) {
+                    widget.classList.add('pulse-red');
+                    hint.innerText = "FACE NOT VISIBLE";
+                    hint.style.display = 'block';
+                } else if (data.num_faces > 1) {
+                    widget.classList.add('pulse-red');
+                    hint.innerText = "MULTIPLE FACES DETECTED";
+                    hint.style.display = 'block';
+                } else if (uc4 > 0.6) {
+                    widget.classList.add('pulse-orange');
+                    hint.innerText = "PLEASE STAY CENTERED";
+                    hint.style.display = 'block';
+                } else if (uc1 < 0.5) {
+                    widget.classList.add('pulse-orange');
+                    hint.innerText = "IDENTITY ALERT";
+                    hint.style.display = 'block';
+                }
+            }
+
             // Update uncertainty badge
             if (uncertValEl) uncertValEl.textContent = uncertainty.toFixed(3);
             if (uncertBadgeEl) {
@@ -1543,22 +1894,57 @@
             }
 
             if (shouldWarn) {
-              // Only update if the message has changed to prevent flickering
               if (warningMessageEl.innerHTML !== msg) {
                 warningMessageEl.innerHTML = msg;
               }
-              // Only touch display if not already visible
               if (warningOverlay.style.display !== 'flex') {
                 warningOverlay.style.display = 'flex';
               }
               isWarningActive = true;
             } else {
-              // Clear Warning
               if (warningOverlay.style.display !== 'none') {
                 warningOverlay.style.display = 'none';
               }
               isWarningActive = false;
             }
+
+            // --- INTERVENTION PROPAGATION ---
+            if (data.intervention_message) {
+                const iAlert = document.getElementById('intervention-alert');
+                const iMsg = document.getElementById('intervention-msg');
+                if (iAlert && iMsg) {
+                    iMsg.innerText = data.intervention_message;
+                    if (iAlert.style.display !== 'flex') {
+                        iAlert.style.display = 'flex';
+                        // Play sound if possible
+                        try { new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3').play(); } catch(e){}
+                    }
+                }
+            }
+
+            // --- MCQ & HYBRID LOGIC ---
+            if (data.mcqs && data.mcqs.length > 0 && !mcqsLoaded) {
+                renderMCQs(data.mcqs);
+            }
+            
+            if (data.contest_type) {
+                const tabs = document.getElementById('exam-tabs');
+                const codingWorkspace = document.getElementById('coding-workspace');
+                const mcqWorkspace = document.getElementById('mcq-workspace');
+                
+                if (data.contest_type === 'mcq') {
+                    if (tabs) tabs.style.display = 'none';
+                    if (codingWorkspace) codingWorkspace.style.display = 'none';
+                    if (mcqWorkspace) mcqWorkspace.style.display = 'block';
+                } else if (data.contest_type === 'hybrid') {
+                    if (tabs) tabs.style.display = 'flex';
+                } else {
+                    if (tabs) tabs.style.display = 'none';
+                    if (codingWorkspace) codingWorkspace.style.display = 'grid';
+                    if (mcqWorkspace) mcqWorkspace.style.display = 'none';
+                }
+            }
+
             // ---------------------------
 
             // Visual Status
@@ -1647,6 +2033,53 @@
           const el = document.getElementById('proctor-help-overlay');
           el.style.display = el.style.display === 'none' ? 'flex' : 'none';
         }
+
+        // --- Browser Security & Event Logging ---
+        async function logSecurityEvent(type, description = "") {
+          if (typeof currentSession === 'undefined' || !currentSession) return;
+          console.log(`[Security Event] ${type}: ${description}`);
+          try {
+            await fetch(`/api/sessions/${currentSession.session_id}/event/`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ type, description })
+            });
+          } catch (e) {
+            console.error("Failed to log security event:", e);
+          }
+        }
+
+        // 1. Tab Switching Detection
+        document.addEventListener('visibilitychange', () => {
+          if (document.hidden) {
+            logSecurityEvent('tab_switch', 'User switched tab or minimized browser');
+            showWarningPopup("Warning: Tab switching is strictly prohibited!");
+          }
+        });
+
+        // 2. Clipboard Monitoring
+        document.addEventListener('copy', (e) => {
+          logSecurityEvent('copy_paste', 'Copy attempt detected');
+        });
+        document.addEventListener('paste', (e) => {
+          logSecurityEvent('copy_paste', 'Paste attempt detected');
+        });
+
+        // 3. Right-Click Blocking
+        document.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          logSecurityEvent('right_click', 'Right-click attempt detected');
+          return false;
+        });
+
+        // 4. Full Screen Monitoring
+        document.addEventListener('fullscreenchange', () => {
+          if (!document.fullscreenElement) {
+            logSecurityEvent('security_violation', 'Exited full screen mode');
+            showWarningPopup("Please stay in full screen mode to continue the exam.");
+          }
+        });
+
 
         // --- Editor & Submission ---
         function initializeCodeEditor() {
@@ -1755,6 +2188,95 @@
               submitCode();
             }
           }, 1000);
+        }
+
+        // --- Enrollment Wizard ---
+        async function runEnrollmentWizard(studentId) {
+          return new Promise((resolve) => {
+            const overlay = document.createElement('div');
+            overlay.className = 'modal-overlay';
+            overlay.style.display = 'flex';
+            overlay.innerHTML = `
+              <div class="modal" style="max-width:440px; text-align:center;">
+                <div style="font-size:32px; margin-bottom:16px;">👤</div>
+                <h2 style="margin-bottom:8px;">Biometric Onboarding</h2>
+                <p style="font-size:14px; color:var(--text-secondary); margin-bottom:20px;">To ensure exam integrity, please enroll your official reference photo. This only takes a moment.</p>
+                
+                <div class="video-preview" style="margin:20px 0; border:3px solid var(--primary); border-radius:12px; overflow:hidden; position:relative; background:#000;">
+                   <video id="e-video" autoplay playsinline muted style="width:100%; display:block;"></video>
+                   <canvas id="e-canvas" style="display:none"></canvas>
+                   <div id="e-overlay" style="position:absolute; top:0; left:0; width:100%; height:100%; border:20px solid rgba(255,255,255,0.1); border-radius:50%; box-shadow: 0 0 0 9999px rgba(0,0,0,0.5); pointer-events:none; box-sizing:border-box;"></div>
+                </div>
+                
+                <div id="e-status" style="font-size:13px; color:var(--text-secondary); margin-bottom:16px; font-weight:600;">Initializing camera...</div>
+                <button id="e-btn" class="btn btn-primary w-full">Enroll My Identity</button>
+                <button id="e-cancel" class="btn btn-outline w-full" style="margin-top:10px;">Cancel</button>
+              </div>
+            `;
+            document.body.appendChild(overlay);
+
+            const video = document.getElementById('e-video');
+            const canvas = document.getElementById('e-canvas');
+            const status = document.getElementById('e-status');
+            const btn = document.getElementById('e-btn');
+            const cancel = document.getElementById('e-cancel');
+            let stream = null;
+
+            navigator.mediaDevices.getUserMedia({ video: true }).then(s => {
+              stream = s;
+              video.srcObject = stream;
+              status.innerText = "Align your face in the center.";
+            }).catch(e => {
+              status.innerText = "Camera Access Denied.";
+              btn.disabled = true;
+            });
+
+            cancel.onclick = () => {
+              if (stream) stream.getTracks().forEach(t => t.stop());
+              document.body.removeChild(overlay);
+              resolve(false);
+            };
+
+            btn.onclick = async () => {
+              btn.disabled = true;
+              btn.innerText = "Enrolling...";
+              
+              const ctx = canvas.getContext('2d');
+              canvas.width = 480;
+              canvas.height = (video.videoHeight / video.videoWidth) * 480;
+              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+              const dataURL = canvas.toDataURL('image/jpeg', 0.9);
+
+              try {
+                const r = await fetch('/api/sessions/enroll_biometric/', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ student_id: studentId, image: dataURL })
+                });
+                const res = await r.json();
+                if (res.ok) {
+                  status.innerText = "✅ Enrollment Successful!";
+                  status.style.color = "var(--success)";
+                  setTimeout(() => {
+                    if (stream) stream.getTracks().forEach(t => t.stop());
+                    document.body.removeChild(overlay);
+                    resolve(true);
+                  }, 1500);
+                } else {
+                  throw new Error(res.error || "Enrollment failed");
+                }
+              } catch (e) {
+                status.innerText = "❌ Failed: " + e.message;
+                status.style.color = "var(--danger)";
+                btn.disabled = false;
+                btn.innerText = "Retry Enrollment";
+              }
+            };
+          });
+        }
+
+        function ackIntervention() {
+            document.getElementById('intervention-alert').style.display = 'none';
         }
 
         function goBack() {

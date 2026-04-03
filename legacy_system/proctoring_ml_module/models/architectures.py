@@ -7,25 +7,11 @@ from torchvision import models
 # UC1: ResNet Embedder
 # ---------------------------------------------------------
 class ResNetEmbedder(nn.Module):
-    """
-    UC1 Identity Embedder
-    --------------------
-    - Backbone: ResNet-50 (ImageNet pretrained)
-    - Output: 256-D L2-normalized embedding
-    - Used for BOTH enrollment and probe images
-    """
-
     def __init__(self, embedding_dim: int = 256, pretrained: bool = True):
         super().__init__()
 
-        # Load ResNet-50 backbone
-        # Note: In a strictly offline/standalone env, we might need to handle 'pretrained=True' failing if no internet.
-        # But for now, we assume standard behavior or cached hub.
         backbone = models.resnet50(pretrained=pretrained)
-
-        # Remove final classification layer
         self.backbone = nn.Sequential(*list(backbone.children())[:-1])
-        # Output now: (B, 2048, 1, 1)
 
         self.embedding_head = nn.Sequential(
             nn.Linear(2048, embedding_dim),
@@ -33,23 +19,10 @@ class ResNetEmbedder(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Args:
-            x: Tensor of shape (B, 3, 224, 224)
-
-        Returns:
-            embeddings: Tensor of shape (B, embedding_dim), L2-normalized
-        """
-        # Feature extraction
-        x = self.backbone(x)          # (B, 2048, 1, 1)
-        x = x.view(x.size(0), -1)     # (B, 2048)
-
-        # Embedding projection
-        x = self.embedding_head(x)    # (B, embedding_dim)
-
-        # L2 normalization (CRITICAL)
+        x = self.backbone(x)
+        x = x.view(x.size(0), -1)
+        x = self.embedding_head(x)
         x = F.normalize(x, p=2, dim=1)
-
         return x
 
 
@@ -68,66 +41,125 @@ class TemporalLSTM(nn.Module):
         self.fc = nn.Linear(hidden_dim, 1)
 
     def forward(self, x):
-        # x: (B, T, input_dim)
         _, (h_n, _) = self.lstm(x)
-        # We take the LAST hidden state to predict instability for this window
         out = self.fc(h_n[-1])
         return out.squeeze(1)
 
 
 # ---------------------------------------------------------
-# UC5: Risk Fusion GRU
+# GAM: Gaze Attentiveness Model (Phase 17)
+# ---------------------------------------------------------
+class GAM(nn.Module):
+    def __init__(self, input_dim=6, hidden_dim=64, num_layers=2, dropout=0.3):
+        super().__init__()
+        self.lstm = nn.LSTM(
+            input_size=input_dim,
+            hidden_size=hidden_dim,
+            num_layers=num_layers,
+            batch_first=True,
+            dropout=dropout if num_layers > 1 else 0,
+            bidirectional=True
+        )
+        self.fc = nn.Linear(hidden_dim * 2, 1)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        h_seq, _ = self.lstm(x)
+        out = self.fc(h_seq)
+        return self.sigmoid(out)
+
+
+# ---------------------------------------------------------
+# HGDM: Head-Gaze Dynamics Model (Phase 18)
+# ---------------------------------------------------------
+class HGDM(nn.Module):
+    def __init__(self, input_dim=7, hidden_dim=64, num_layers=2, dropout=0.3):
+        super().__init__()
+        self.lstm = nn.LSTM(
+            input_size=input_dim,
+            hidden_size=hidden_dim,
+            num_layers=num_layers,
+            batch_first=True,
+            dropout=dropout if num_layers > 1 else 0,
+            bidirectional=True
+        )
+        self.fc = nn.Linear(hidden_dim * 2, 1)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        h_seq, _ = self.lstm(x)
+        out = self.fc(h_seq)
+        return self.sigmoid(out)
+
+
+# ---------------------------------------------------------
+# UC6: Audio Anomaly Detection (Phase 19)
+# ---------------------------------------------------------
+class UC6AudioNet(nn.Module):
+    """
+    Sequence-based audio anomaly detector.
+    Input: (B, T, 1) - amplitude/volume levels
+    """
+    def __init__(self, hidden_dim=32, num_layers=1):
+        super().__init__()
+        self.lstm = nn.LSTM(1, hidden_dim, num_layers, batch_first=True)
+        self.fc = nn.Linear(hidden_dim, 1)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        _, (h_n, _) = self.lstm(x)
+        out = self.fc(h_n[-1])
+        return self.sigmoid(out)
+
+
+# ---------------------------------------------------------
+# UC5: Risk Fusion GRU (7-Signal Version - Phase 19)
 # ---------------------------------------------------------
 class RiskFusionGRU(nn.Module):
     """
-    GRU-based risk fusion model for UC5.
+    GRU-based risk fusion model (Phase 19).
 
     Input:
-        x: Tensor of shape (B, T, 2)
-           where features = [UC1_similarity, UC2_impersonation_prob]
+        x: Tensor of shape (B, T, 7)
+           features = [
+               UC1_similarity,
+               UC2_instability_prob,
+               UC3_presence_prob,
+               UC4_drift_prob,
+               GAM_gaze_prob,
+               HGDM_head_gaze_prob,
+               UC6_audio_prob
+           ]
 
     Output:
-        risk_traj: Tensor of shape (B, T)
-                   continuous risk evidence over time
-        final_risk: Tensor of shape (B,)
-                    final session-level cheating risk (logit)
+        risk_traj: (B, T)
+        final_risk: (B,)
     """
 
-    def __init__(self, input_dim=2, hidden_dim=32):
+    def __init__(self, input_dim=7, hidden_dim=32):
         super().__init__()
 
         self.hidden_dim = hidden_dim
 
-        # GRU for temporal risk accumulation
         self.gru = nn.GRU(
             input_size=input_dim,
             hidden_size=hidden_dim,
             batch_first=True
         )
 
-        # Linear projection from hidden state → risk evidence
-        self.risk_head = nn.Linear(hidden_dim, 1)
+        self.risk_head = nn.Linear(hidden_dim, 2)
 
     def forward(self, x):
-        """
-        Args:
-            x: (B, T, 2)
 
-        Returns:
-            risk_traj: (B, T)
-            final_risk: (B,)
-        """
-
-        # h_seq: (B, T, hidden_dim)
         h_seq, _ = self.gru(x)
 
-        # risk_logits: (B, T, 1)
-        risk_logits = self.risk_head(h_seq)
+        output = self.risk_head(h_seq)
+        mu, log_var = output.chunk(2, dim=-1)
 
-        # squeeze last dim → (B, T)
-        risk_traj = risk_logits.squeeze(-1)
+        risk_traj = torch.sigmoid(mu).squeeze(-1)
+        uncertainty_traj = torch.exp(0.5 * log_var).squeeze(-1)
 
-        # final timestep risk (session-level)
         final_risk = risk_traj[:, -1]
+        final_uncertainty = uncertainty_traj[:, -1]
 
-        return risk_traj, final_risk
+        return risk_traj, final_risk, uncertainty_traj, final_uncertainty

@@ -48,8 +48,6 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-CORS_ALLOW_ALL_ORIGINS=True
-
 ROOT_URLCONF = 'coding_exam_system.urls'
 
 TEMPLATES = [
@@ -69,6 +67,8 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'coding_exam_system.wsgi.application'
+
+LOGIN_URL = '/login/'
 
 # Database - Using SQLite for now, will configure MongoDB separately
 DATABASES = {
@@ -177,9 +177,10 @@ REST_FRAMEWORK = {
 # CORS settings
 CORS_ALLOW_ALL_ORIGINS = DEBUG
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:8000",
-    "http://127.0.0.1:8000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
 ]
+CORS_ALLOW_CREDENTIALS = True
 
 # Security settings
 if not DEBUG:

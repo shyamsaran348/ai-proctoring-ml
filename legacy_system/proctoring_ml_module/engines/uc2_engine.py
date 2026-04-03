@@ -15,15 +15,11 @@ class UC2Engine:
         self.device = torch.device(config.get('inference', {}).get('device', 'cpu'))
         self.model_config = config['models']['uc2']
         self.model_path = self.model_config['path']
-        
-        # Multi-Res Requirements
-        self.base_seq_len = self.model_config.get('sequence_length', 60)
-        self.max_buffer_len = 120 # For Long Stream
-        
+        self.seq_len = self.model_config.get('sequence_length', 60)
         self.hidden_dim = self.model_config.get('hidden_dim', 64)
         
         # Buffer to hold last N similarity scores
-        self.buffer = deque(maxlen=self.max_buffer_len)
+        self.buffer = deque(maxlen=self.seq_len)
         
         self.model = TemporalLSTM(
             input_dim=self.model_config.get('input_dim', 1),
@@ -49,74 +45,33 @@ class UC2Engine:
     def update(self, uc1_similarity: float) -> float:
         """
         Update the engine with the latest UC1 similarity score.
-        Returns the instability probability (0.0 to 1.0) using Multi-Resolution Ensemble.
+        Returns the instability probability (0.0 to 1.0).
         """
         # Append to buffer
         self.buffer.append(uc1_similarity)
         
-        if len(self.buffer) == 0:
-            return 0.0
-
-        # Create Parallel Streams
-        # All streams must result in [60, 1] tensor for the model
+        # Prepare sequence
+        current_len = len(self.buffer)
+        if current_len == 0:
+            return 0.0 # Should not happen if update is called
         
-        # 1. Short Stream (Last 30 frames) - Micro Instability
-        short_seq = self._prepare_stream(window=30, downsample=1)
+        # If buffer is not full, pad with the OLDEST value available (or newest?)
+        # Strategy: Replicate the first (oldest) value in the buffer to the left
+        # to fill the sequence.
+        # e.g., buffer=[0.9, 0.8] (len 2), seq -> [0.9, ..., 0.9, 0.9, 0.8]
+        # This simulates "steady state" before the session started.
         
-        # 2. Medium Stream (Last 60 frames) - Standard
-        med_seq = self._prepare_stream(window=60, downsample=1)
-        
-        # 3. Long Stream (Last 120 frames) - Drift / Slow Changes
-        long_seq = self._prepare_stream(window=120, downsample=2)
-        
-        # Batch: (3, 60, 1)
-        batch = torch.stack([short_seq, med_seq, long_seq]).to(self.device)
-        
-        with torch.inference_mode():
-            logits = self.model(batch) # (3,)
-            probs = torch.sigmoid(logits)
+        seq_data = list(self.buffer)
+        if current_len < self.seq_len:
+            pad_val = seq_data[0] # The earliest known state
+            padding = [pad_val] * (self.seq_len - current_len)
+            seq_data = padding + seq_data
             
-        # Ensemble: Max Instability (Conservative: if any scale is unstable, flag it)
-        # Or mean? Max is safer for proctoring.
-        final_prob = torch.max(probs).item()
-            
-        return final_prob
-
-    def _prepare_stream(self, window, downsample=1):
-        """
-        Extracts a window from the buffer, pads/processes it to fit base_seq_len (60).
-        """
-        data = list(self.buffer)
+        # Convert to tensor: (B=1, T=60, Input=1)
+        input_tensor = torch.tensor(seq_data, dtype=torch.float32).unsqueeze(0).unsqueeze(2).to(self.device)
         
-        # 1. Slice the relevant window from the END
-        # If we want the last 'window' frames
-        target_len = window
-        start_idx = max(0, len(data) - target_len)
-        slice_data = data[start_idx:]
-        
-        # 2. Pad if insufficient length (pre-pad)
-        if len(slice_data) < target_len:
-            pad_val = slice_data[0] if slice_data else 0.0
-            padding = [pad_val] * (target_len - len(slice_data))
-            slice_data = padding + slice_data
+        with torch.no_grad():
+            logit = self.model(input_tensor) # (1,)
+            prob = torch.sigmoid(logit).item()
             
-        # 3. Downsample if needed
-        # e.g., if window=120, downsample=2 -> 60 frames
-        if downsample > 1:
-            slice_data = slice_data[::downsample]
-        
-        # 4. Final check: Should be exactly 60 now?
-        # If window=30, downsample=1 -> 30 frames. Need to pad to 60?
-        # Model expects 60.
-        # Logic: If result < 60, pad again?
-        # For Short (30): We have 30 frames. Need 60.
-        # Pad with first value again.
-        if len(slice_data) < self.base_seq_len:
-            pad_val = slice_data[0]
-            padding = [pad_val] * (self.base_seq_len - len(slice_data))
-            slice_data = padding + slice_data
-        elif len(slice_data) > self.base_seq_len:
-            # Should not happen if logic is correct, but clip just in case
-            slice_data = slice_data[-self.base_seq_len:]
-            
-        return torch.tensor(slice_data, dtype=torch.float32).unsqueeze(1) # (60, 1)
+        return prob

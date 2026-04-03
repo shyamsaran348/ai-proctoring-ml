@@ -5,12 +5,12 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
+
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('exams.urls')),
-    path('', include('exams.urls')),
     # Add favicon route to prevent 404 errors
     path('favicon.ico', lambda request: HttpResponse(status=204, content_type='image/x-icon')),
     # MongoDB test endpoint

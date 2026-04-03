@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Faculty Dashboard | DevProctor</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --bg: #f8fafc;
+            --glass: rgba(255, 255, 255, 0.8);
+            --border: #e2e8f0;
+            --text-main: #0f172a;
+            --text-secondary: #64748b;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text-main); }
+
+        .sidebar {
+            width: 260px;
+            height: 100vh;
+            background: #ffffff;
+            border-right: 1px solid var(--border);
+            position: fixed;
+            padding: 24px;
+        }
+
+        .main-content {
+            margin-left: 260px;
+            padding: 40px;
+        }
+
+        .brand {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 40px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        nav ul { list-style: none; }
+        nav li { margin-bottom: 8px; }
+        nav a {
+            text-decoration: none;
+            color: var(--text-secondary);
+            padding: 12px 16px;
+            border-radius: 8px;
+            display: block;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        nav a.active, nav a:hover {
+            background: #f1f5f9;
+            color: var(--primary);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 24px;
+            margin-bottom: 40px;
+        }
+
+        .stat-card {
+            background: #ffffff;
+            padding: 24px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .stat-val { font-size: 24px; font-weight: 700; margin-top: 8px; }
+        .stat-label { font-size: 13px; color: var(--text-secondary); font-weight: 500; text-transform: uppercase; }
+
+        .section {
+            background: #ffffff;
+            padding: 32px;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            margin-bottom: 32px;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-outline { background: white; border: 1px solid var(--border); color: var(--text-secondary); }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+        th { text-align: left; padding: 12px; font-size: 13px; font-weight: 600; color: var(--text-secondary); border-bottom: 2px solid var(--bg); }
+        td { padding: 16px 12px; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
+
+        .risk-badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .risk-high { background: #fee2e2; color: #991b1b; }
+        .risk-low { background: #dcfce7; color: #166534; }
+
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;
+            z-index: 1000; display: none;
+        }
+
+        .modal {
+            background: white; padding: 40px; border-radius: 16px; width: 500px;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+        }
+
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; font-size: 13px; font-weight: 600; }
+        .form-group input, .form-group textarea, .form-group select {
+            width: 100%; padding: 10px; border-radius: 6px; border: 1px solid var(--border);
+        }
+
+        /* Live Alert Styles */
+        #live-alerts {
+            position: fixed; top: 20px; right: 20px; width: 320px; z-index: 10000;
+            display: flex; flex-direction: column; gap: 12px;
+        }
+        .toast {
+            background: white; border-left: 4px solid var(--danger);
+            padding: 16px; border-radius: 12px;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+            animation: slideIn 0.3s ease-out;
+            cursor: pointer;
+        }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .toast-header { font-weight: 700; font-size: 13px; color: var(--danger); margin-bottom: 4px; display: flex; justify-content: space-between; }
+        .toast-label { font-size: 11px; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 8px; }
+        .toast-student { font-weight: 600; font-size: 14px; margin-bottom: 2px; }
+
+        .row-highlight { animation: flash-red 2s infinite; }
+        @keyframes flash-red { 
+            0% { background: white; } 
+            50% { background: #fee2e2; } 
+            100% { background: white; } 
+        }
+
+        /* Designer Modal Layout */
+        .designer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 20px; }
+        .designer-pane { 
+            background: #f8fafc; border: 1px solid var(--border); border-radius: 12px; 
+            height: 500px; display: flex; flex-direction: column; overflow: hidden;
+        }
+        .pane-header { padding: 15px 20px; background: white; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .pane-list { flex: 1; overflow-y: auto; padding: 15px; }
+        .designer-card { 
+            background: white; border: 1px solid var(--border); border-radius: 8px; padding: 12px;
+            margin-bottom: 10px; cursor: pointer; transition: all 0.2s; 
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .designer-card:hover { border-color: var(--primary); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        .designer-card .type { font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; margin-right: 8px; }
+        .type-mcq { background: #dcfce7; color: #166534; }
+        .type-code { background: #e0e7ff; color: #4338ca; }
+    </style>
+</head>
+<body>
+    <div id="live-alerts"></div>
+    <div class="sidebar">
+    <div class="brand">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7L12 12L22 7L12 2Z"/><path d="M2 17L12 22L22 17"/><path d="M2 12L12 17L22 12"/></svg>
+        DevProctor
+    </div>
+    <nav>
+        <ul>
+            <li><a href="#" class="active">Dashboard</a></li>
+            <li><a href="#">Question Bank</a></li>
+            <li><a href="#">Exams & Contests</a></li>
+            <li><a href="#">Reports</a></li>
+            <li><a href="#">Settings</a></li>
+        </ul>
+    </nav>
+</div>
+
+<div class="main-content">
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-label">Total Problems</div>
+            <div class="stat-val">{{ problems.count }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">MCQ Questions</div>
+            <div class="stat-val">{{ mcqs.count }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Active Exams</div>
+            <div class="stat-val">{{ contests.count }}</div>
+        </div>
+        <div class="stat-card" style="border-color: var(--danger);">
+            <div class="stat-label" style="color: var(--danger);">Flagged Sessions</div>
+            <div class="stat-val">2</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-header">
+            <h2>Active Exams & Assessments</h2>
+            <button class="btn btn-primary" onclick="showModal('contestModal')">+ Create Exam</button>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Exam Title</th>
+                    <th>Type</th>
+                    <th>Submissions</th>
+                    <th>Date</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in contests %}
+                <tr>
+                    <td><strong>{{ c.title }}</strong></td>
+                    <td>{{ c.get_contest_type_display }}</td>
+                    <td>{{ c.exam_sessions.count }}</td>
+                    <td>{{ c.start_time|date:"M d, Y" }}</td>
+                    <td>
+                        <button class="btn btn-outline btn-sm" onclick="openDesigner('{{ c.id }}')">Designer</button>
+                    </td>
+
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Question Bank Section -->
+    <div class="section">
+        <div class="section-header">
+            <h2>Question Bank Repository</h2>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn btn-outline" onclick="showModal('problemModal')">+ Coding Problem</button>
+                <button class="btn btn-outline" onclick="showModal('mcqModal')">+ MCQ</button>
+                <div style="width: 1px; background: var(--border); margin: 0 10px;"></div>
+                <input type="text" id="q-search" placeholder="Search questions..." class="btn btn-outline" style="width: 250px; text-align: left;" onkeyup="filterQuestions()">
+
+                <select id="q-diff" class="btn btn-outline" onchange="filterQuestions()">
+                    <option value="">All Difficulty</option>
+                    <option value="Easy">Easy</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Hard">Hard</option>
+                </select>
+            </div>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Type</th>
+                    <th>Title / Context</th>
+                    <th>Difficulty</th>
+                    <th>Points</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in problems %}
+                <tr class="q-row" data-title="{{ p.title|lower }}" data-diff="{{ p.get_difficulty_display }}">
+                    <td><span style="color:#4f46e5; font-weight:600;">CODE</span></td>
+                    <td>{{ p.title }}</td>
+                    <td>{{ p.get_difficulty_display }}</td>
+                    <td>{{ p.points }}</td>
+                    <td>
+                        <a href="javascript:void(0)" onclick="openEditProblem('{{ p.id }}')" style="color: var(--primary); margin-right: 10px;">Edit</a>
+                    </td>
+
+                </tr>
+
+
+                {% endfor %}
+                {% for m in mcqs %}
+                <tr class="q-row" data-title="{{ m.question_text|lower }}" data-diff="">
+                    <td><span style="color:#10b981; font-weight:600;">MCQ</span></td>
+                    <td>{{ m.question_text|truncatechars:60 }}</td>
+                    <td>-</td>
+                    <td>{{ m.marks }}</td>
+                    <td><a href="javascript:void(0)" onclick="openEditMCQ('{{ m.id }}')" style="color: var(--primary);">Edit</a></td>
+                </tr>
+
+
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Recent Proctored Sessions -->
+    <div class="section">
+        <div class="section-header">
+            <h2>Live & Recent Sessions</h2>
+            <div style="display: flex; gap: 12px;">
+                <button class="btn btn-outline" onclick="location.reload()">Refresh Data</button>
+            </div>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Student</th>
+                    <th>Exam / Contest</th>
+                    <th>MCQ Score</th>
+                    <th>Final Risk</th>
+                    <th>Violations</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+
+            </thead>
+            <tbody>
+                {% for s in recent_sessions %}
+                <tr>
+                    <td>
+                        <div style="font-weight: 600;">{{ s.student.username|default:"Anonymous" }}</div>
+                        <div style="font-size: 11px; color: var(--text-secondary);">ID: {{ s.session_id|slice:":8" }}</div>
+                    </td>
+                    <td>{{ s.contest.title|default:"Practice" }}</td>
+                    <td><span style="font-weight: 600; color: var(--primary);">{{ s.marks_obtained }}</span> pts</td>
+                    <td>
+                        <span class="risk-badge {% if s.proctoring_data.risk_score > 70 %}risk-high{% else %}risk-low{% endif %}">
+                            {{ s.proctoring_data.risk_score|floatformat:1 }}%
+                        </span>
+                    </td>
+                    <td>{{ s.proctoring_data.face_detection_failures }} Alerts</td>
+                    <td>{{ s.status|title }}</td>
+                    <td>
+                        <button class="btn btn-primary btn-sm" onclick="openDeepDive('{{ s.session_id }}')">Deep Dive</button>
+                    </td>
+                </tr>
+
+
+                {% empty %}
+                <tr><td colspan="5" style="text-align:center; padding: 40px; color: var(--text-secondary);">No sessions found yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- MOCK MODALS FOR DEMO -->
+<div id="mcqModal" class="modal-overlay" onclick="hideModal('mcqModal')">
+    <div class="modal" onclick="event.stopPropagation()">
+        <h3>Create New MCQ</h3>
+        <p style="margin-bottom: 20px; color: var(--text-secondary); font-size: 14px;">Define query and select correct option.</p>
+        <div class="form-group">
+            <label>Question Text</label>
+            <textarea placeholder="e.g. What is the time complexity of binary search?"></textarea>
+        </div>
+        <div class="form-group">
+            <label>Options (One per line)</label>
+            <textarea placeholder="O(1)\nO(n)\nO(log n)\nO(n^2)"></textarea>
+        </div>
+        <div class="form-group">
+            <label>Correct Option Index (0-3)</label>
+            <input type="number" id="mcq-correct" value="0" min="0" max="3">
+        </div>
+        <div class="form-group">
+            <label>Link to Contest (Optional)</label>
+            <select id="mcq-contest" class="btn btn-outline" style="width: 100%; text-align: left;">
+                <option value="">None (Repository Only)</option>
+                {% for c in contests %}<option value="{{ c.id }}">{{ c.title }}</option>{% endfor %}
+            </select>
+        </div>
+        <button class="btn btn-primary w-full" style="width: 100%;" onclick="saveMCQ()">Save to Repository</button>
+    </div>
+</div>
+
+<div id="problemModal" class="modal-overlay" onclick="hideModal('problemModal')">
+    <div class="modal" style="width: 800px; max-height: 90vh; overflow-y: auto;" onclick="event.stopPropagation()">
+        <h3>Create Coding Problem</h3>
+        <div class="designer-grid" style="margin-top: 20px;">
+            <div class="form-group">
+                <label>Problem Title</label>
+                <input type="text" id="p-title" placeholder="e.g. Reverse a String">
+            </div>
+            <div class="form-group">
+                <label>Difficulty</label>
+                <select id="p-diff" class="btn btn-outline" style="width: 100%;">
+                    <option value="easy">Easy</option>
+                    <option value="medium">Medium</option>
+                    <option value="hard">Hard</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Problem Statement</label>
+            <textarea id="p-statement" style="height: 100px;" placeholder="Describe the task..."></textarea>
+        </div>
+        <div class="designer-grid">
+            <div class="form-group">
+                <label>Input Format</label>
+                <textarea id="p-input" style="height: 60px;"></textarea>
+            </div>
+            <div class="form-group">
+                <label>Output Format</label>
+                <textarea id="p-output" style="height: 60px;"></textarea>
+            </div>
+        </div>
+        
+        <h4 style="margin: 20px 0 10px;">Test Cases</h4>
+        <div id="testcase-list">
+            <div class="testcase-item designer-item" style="display: grid; grid-template-columns: 1fr 1fr 100px; gap: 10px; margin-bottom: 10px;">
+                <input type="text" placeholder="Input (JSON-like)" class="tc-input">
+                <input type="text" placeholder="Expected (JSON-like)" class="tc-expected">
+                <select class="tc-type btn btn-outline btn-sm">
+                    <option value="sample">Sample</option>
+                    <option value="private">Private</option>
+                </select>
+
+            </div>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="addTestCaseRow()">+ Add Test Case</button>
+        
+        <div style="margin-top: 30px; display: flex; gap: 15px;">
+            <button class="btn btn-primary" style="flex: 1;" onclick="saveProblem()">Create Problem</button>
+            <button class="btn btn-outline" style="flex: 1;" onclick="hideModal('problemModal')">Cancel</button>
+        </div>
+    </div>
+</div>
+
+
+<script>
+    function showModal(id) { document.getElementById(id).style.display = 'flex'; }
+    function hideModal(id) { document.getElementById(id).style.display = 'none'; }
+
+    // --- Live Proctoring Pulse (SSE) ---
+    function initLivePulse() {
+        console.log("Initializing Real-Time Proctoring Pulse...");
+        const source = new EventSource('/api/exam-sessions/proctoring_pulse/');
+
+        source.addEventListener('risk_alert', (e) => {
+            const alerts = JSON.parse(e.data);
+            alerts.forEach(alert => {
+                showToast(alert);
+                highlightStudentRow(alert.session_id);
+            });
+        });
+
+        source.onerror = (err) => {
+            console.warn("Pulse connection lost. Retrying in 5s...");
+            source.close();
+            setTimeout(initLivePulse, 5000);
+        };
+    }
+
+    function showToast(alert) {
+        const container = document.getElementById('live-alerts');
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.innerHTML = `
+            <div class="toast-header">
+                <span>⚠️ HIGH RISK ALERT</span>
+                <span style="font-size:10px; color:#94a3b8;">${new Date().toLocaleTimeString()}</span>
+            </div>
+            <div class="toast-label">${alert.primary_violation}</div>
+            <div class="toast-student">${alert.student}</div>
+            <div style="font-size:11px; color:var(--text-secondary);">Session: ${alert.session_id.substring(0,8)}...</div>
+            <div style="margin-top:8px; display:flex; align-items:center; gap:6px;">
+                <div style="height:4px; flex:1; background:#f1f5f9; border-radius:2px; overflow:hidden;">
+                    <div style="width:${alert.risk*100}%; height:100%; background:var(--danger);"></div>
+                </div>
+                <span style="font-weight:700; color:var(--danger); font-size:11px;">${(alert.risk*100).toFixed(0)}%</span>
+            </div>
+        `;
+        container.prepend(toast);
+        
+        // Auto-remove after 8 seconds
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(20px)';
+            toast.style.transition = 'all 0.5s';
+            setTimeout(() => toast.remove(), 500);
+        }, 8000);
+    }
+
+    function highlightStudentRow(sessionId) {
+        // Find row by finding the 'Inspect' button which has the ID if possible, 
+        // or we might need to add a data-session-id to rows.
+        // Let's assume we can find it via text content for now or I'll add the attribute in a separate chunk.
+        const rows = document.querySelectorAll('tbody tr');
+        rows.forEach(row => {
+           if (row.innerText.includes(sessionId.substring(0,8))) {
+               row.classList.add('row-highlight');
+               setTimeout(() => row.classList.remove('row-highlight'), 10000);
+           }
+        });
+    }
+
+    window.onload = function() {
+        initLivePulse();
+    };
+
+    let currentContestId = null;
+    let availableProblems = [];
+    let selectedProblems = [];
+
+    async function openDesigner(contestId) {
+        currentContestId = contestId;
+        const res = await fetch(`/api/sessions/0/exam_designer/?contest_id=${contestId}`); // Use dummy id 0
+        const data = await res.json();
+        
+        availableProblems = data.all_problems;
+        const currentProblemIds = data.current_problems.map(p => p.problem_id);
+        
+        const unselected = availableProblems.filter(p => !currentProblemIds.includes(p.id));
+        const selected = data.current_problems.map(cp => {
+            const prob = availableProblems.find(p => p.id === cp.problem_id);
+            return { ...prob, limit: cp.time_limit_override };
+        });
+
+        renderDesignerLists(unselected, selected);
+        showModal('designerModal');
+    }
+
+    function renderDesignerLists(unselected, selected) {
+        const repoList = document.getElementById('repo-list');
+        const examList = document.getElementById('exam-list');
+        
+        repoList.innerHTML = unselected.map(p => `
+            <div class="designer-item" data-id="${p.id}">
+                <div>
+                   <strong>${p.title}</strong>
+                   <div style="font-size:11px; color:var(--text-secondary)">${p.difficulty}</div>
+                </div>
+            </div>
+        `).join('');
+
+        examList.innerHTML = selected.map(p => `
+            <div class="designer-item active" data-id="${p.id}">
+                <div>
+                   <strong>${p.title}</strong>
+                   <input type="number" class="limit-input" value="${p.limit || 60}" placeholder="Min">
+                </div>
+            </div>
+        `).join('');
+
+        new Sortable(repoList, { group: 'shared', animation: 150 });
+        new Sortable(examList, { group: 'shared', animation: 150 });
+    }
+
+    async function saveStructure() {
+        // ... (existing save logic)
+        const examListItems = document.querySelectorAll('#exam-list .designer-item');
+        const problems = Array.from(examListItems).map((item, index) => ({
+            id: item.dataset.id,
+            order: index,
+            limit: item.querySelector('.limit-input').value
+        }));
+
+        await fetch('/api/sessions/update_structure/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contest_id: currentContestId,
+                problems: problems
+            })
+        });
+        
+        alert('Exam structure updated!');
+        hideModal('designerModal');
+        location.reload();
+    }
+
+    let currentSessionId = null;
+
+    // Session Deep Dive Logic
+    async function openDeepDive(sessionId) {
+        currentSessionId = sessionId;
+        const res = await fetch(`/api/sessions/${sessionId}/session_history/`);
+        const data = await res.json();
+        
+        const timeline = document.getElementById('timeline-list');
+        const gallery = document.getElementById('gallery-grid');
+        
+        document.getElementById('dd-student-name').innerText = data.student_id;
+        document.getElementById('dd-session-id').innerText = data.session_id;
+
+        // Filter violations for timeline
+        const violations = data.history.filter(h => h.risk_score > 0.5 || h.violation);
+        
+        timeline.innerHTML = violations.length ? violations.map(v => `
+            <div class="timeline-event">
+                <span class="event-time">${new Date(v.timestamp).toLocaleTimeString()}</span>
+                <span class="event-risk" style="color:${v.risk_score > 0.8 ? 'var(--danger)' : 'var(--warning)'}">
+                    Risk: ${(v.risk_score * 100).toFixed(0)}%
+                </span>
+                <p class="event-desc">${v.violation || 'High Risk Behavior detected'}</p>
+                ${v.meta_data ? `
+                <div style="font-size: 10px; color: var(--text-secondary); margin-top: 5px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px;">
+                    <span>UC1: ${(v.meta_data.uc1_sim || 0).toFixed(2)}</span>
+                    <span>UC2: ${(v.meta_data.uc2_instability || 0).toFixed(2)}</span>
+                    <span>UC3: ${(v.meta_data.uc3_presence || 0).toFixed(2)}</span>
+                    <span>UC4: ${(v.meta_data.uc4_drift || 0).toFixed(2)}</span>
+                    <span>UC5: ${(v.meta_data.gam_gaze || 0).toFixed(2)}</span>
+                    <span>UC6: ${(v.meta_data.hgdm_prob || 0).toFixed(2)}</span>
+                </div>
+                ` : ''}
+            </div>
+        `).join('') : '<p style="padding:20px; color:var(--text-secondary)">No major violations detected.</p>';
+
+        // Filter screenshots
+        const screenshots = data.history.filter(h => h.frame_url);
+        gallery.innerHTML = screenshots.map(s => `
+            <div class="gallery-item">
+                <img src="${s.frame_url}" loading="lazy">
+                <div class="gallery-meta">
+                    <span>${new Date(s.timestamp).toLocaleTimeString()}</span>
+                    <span>Risk: ${(s.risk_score * 100).toFixed(0)}%</span>
+                </div>
+            </div>
+        `).join('');
+
+        showModal('deepDiveModal');
+    }
+
+    function exportSessionReport() {
+        if (!currentSessionId) return;
+        window.open(`/api/sessions/${currentSessionId}/export_report/`, '_blank');
+    }
+
+    function filterQuestions() {
+        const query = document.getElementById('q-search').value.toLowerCase();
+        const diff = document.getElementById('q-diff').value;
+        const rows = document.querySelectorAll('.q-row');
+        
+        rows.forEach(row => {
+            const title = row.dataset.title || "";
+            const rowDiff = row.dataset.diff || "";
+            const matchQuery = title.includes(query);
+            const matchDiff = !diff || rowDiff === diff;
+            
+            row.style.display = (matchQuery && matchDiff) ? '' : 'none';
+        });
+    }
+
+    // --- Question Authoring Logic ---
+
+    function addTestCaseRow() {
+        const list = document.getElementById('testcase-list');
+        const div = document.createElement('div');
+        div.className = 'testcase-item designer-item';
+        div.style.cssText = 'display: grid; grid-template-columns: 1fr 1fr 100px; gap: 10px; margin-bottom: 10px;';
+        div.innerHTML = `
+            <input type="text" placeholder="Input" class="tc-input">
+            <input type="text" placeholder="Expected" class="tc-expected">
+            <select class="tc-type btn btn-outline btn-sm">
+                <option value="sample">Sample</option>
+                <option value="private">Private</option>
+            </select>
+
+        `;
+        list.appendChild(div);
+    }
+
+    async function saveMCQ() {
+        const data = {
+            question_text: document.querySelector('#mcqModal textarea').value,
+            options: document.querySelectorAll('#mcqModal textarea')[1].value.split('\n').filter(o => o.trim()),
+            correct_option: document.getElementById('mcq-correct').value,
+            contest: document.getElementById('mcq-contest').value || null,
+            marks: 1
+        };
+
+        const res = await fetch('/api/mcqs/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+
+        if (res.ok) {
+            alert('MCQ saved successfully!');
+            location.reload();
+        } else {
+            alert('Error saving MCQ');
+        }
+    }
+
+    async function saveProblem() {
+        const tcs = Array.from(document.querySelectorAll('.testcase-item')).map(item => ({
+            input_data: item.querySelector('.tc-input').value,
+            expected_output: item.querySelector('.tc-expected').value,
+            test_type: item.querySelector('.tc-type').value,
+            name: "Test Case"
+        }));
+
+        const data = {
+            title: document.getElementById('p-title').value,
+            difficulty: document.getElementById('p-diff').value,
+            problem_statement: document.getElementById('p-statement').value,
+            input_format: document.getElementById('p-input').value,
+            output_format: document.getElementById('p-output').value,
+            test_cases: tcs,
+            points: 10
+        };
+
+        const res = await fetch('/api/problems/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+
+        if (res.ok) {
+            alert('Problem created successfully!');
+            location.reload();
+        } else {
+            alert('Error creating problem');
+        }
+    }
+
+    let currentEditProblemId = null;
+    let currentEditMCQId = null;
+
+    async function openEditProblem(id) {
+        currentEditProblemId = id;
+        const res = await fetch(`/api/problems/${id}/`);
+        const p = await res.json();
+        
+        document.getElementById('p-title').value = p.title;
+        document.getElementById('p-diff').value = p.difficulty;
+        document.getElementById('p-statement').value = p.problem_statement;
+        document.getElementById('p-input').value = p.input_format;
+        document.getElementById('p-output').value = p.output_format;
+        
+        const list = document.getElementById('testcase-list');
+        list.innerHTML = '';
+        if (p.test_cases && p.test_cases.length) {
+            p.test_cases.forEach(tc => {
+                const div = document.createElement('div');
+                div.className = 'testcase-item designer-item';
+                div.style.cssText = 'display: grid; grid-template-columns: 1fr 1fr 100px; gap: 10px; margin-bottom: 10px;';
+                div.innerHTML = `
+                    <input type="text" placeholder="Input" class="tc-input" value='${tc.input_data}'>
+                    <input type="text" placeholder="Expected" class="tc-expected" value='${tc.expected_output}'>
+                    <select class="tc-type btn btn-outline btn-sm">
+                        <option value="sample" ${tc.test_type === 'sample' ? 'selected' : ''}>Sample</option>
+                        <option value="hidden" ${tc.test_type === 'hidden' ? 'selected' : ''}>Hidden</option>
+                    </select>
+                `;
+                list.appendChild(div);
+            });
+        } else {
+            addTestCaseRow();
+        }
+        
+        document.querySelector('#problemModal h3').innerText = "Edit Coding Problem";
+        document.querySelector('#problemModal .btn-primary').innerText = "Update Problem";
+        document.querySelector('#problemModal .btn-primary').onclick = updateProblem;
+        showModal('problemModal');
+    }
+
+    async function updateProblem() {
+        const tcs = Array.from(document.querySelectorAll('.testcase-item')).map(item => ({
+            input_data: item.querySelector('.tc-input').value,
+            expected_output: item.querySelector('.tc-expected').value,
+            test_type: item.querySelector('.tc-type').value,
+            name: "Test Case"
+        }));
+
+        const data = {
+            title: document.getElementById('p-title').value,
+            difficulty: document.getElementById('p-diff').value,
+            problem_statement: document.getElementById('p-statement').value,
+            input_format: document.getElementById('p-input').value,
+            output_format: document.getElementById('p-output').value,
+            test_cases: tcs
+        };
+
+        const res = await fetch(`/api/problems/${currentEditProblemId}/`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+
+        if (res.ok) {
+            alert('Problem updated successfully!');
+            location.reload();
+        } else {
+            alert('Error updating problem');
+        }
+    }
+
+    async function openEditMCQ(id) {
+        currentEditMCQId = id;
+        const res = await fetch(`/api/mcqs/${id}/`);
+        const m = await res.json();
+        
+        document.querySelector('#mcqModal textarea').value = m.question_text;
+        document.querySelectorAll('#mcqModal textarea')[1].value = m.options.join('\n');
+        document.getElementById('mcq-correct').value = m.correct_option;
+        document.getElementById('mcq-contest').value = m.contest || "";
+        
+        document.querySelector('#mcqModal h3').innerText = "Edit MCQ";
+        document.querySelector('#mcqModal .btn-primary').innerText = "Update MCQ";
+        document.querySelector('#mcqModal .btn-primary').onclick = updateMCQ;
+        showModal('mcqModal');
+    }
+
+    async function updateMCQ() {
+        const data = {
+            question_text: document.querySelector('#mcqModal textarea').value,
+            options: document.querySelectorAll('#mcqModal textarea')[1].value.split('\n').filter(o => o.trim()),
+            correct_option: document.getElementById('mcq-correct').value,
+            contest: document.getElementById('mcq-contest').value || null
+        };
+
+        const res = await fetch(`/api/mcqs/${currentEditMCQId}/`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+
+        if (res.ok) {
+            alert('MCQ updated successfully!');
+            location.reload();
+        } else {
+            alert('Error updating MCQ');
+        }
+    }
+</script>
+
+
+
+
+<style>
+    /* Deep Dive Styles */
+    .dd-grid { display: grid; grid-template-columns: 350px 1fr; gap: 30px; height: 600px; overflow: hidden; }
+    .timeline-list { overflow-y: auto; background: white; border-radius: 12px; padding: 20px; border: 1px solid var(--border); }
+    .timeline-event { border-left: 2px solid var(--primary); padding-left: 15px; margin-bottom: 20px; position: relative; }
+    .timeline-event::before { content: ''; width: 10px; height: 10px; background: var(--primary); border-radius: 50%; position: absolute; left: -6px; top: 4px; }
+    .event-time { font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; }
+    .event-risk { font-size: 12px; font-weight: 700; float: right; }
+    .event-desc { font-size: 13px; color: var(--text-main); margin-top: 5px; }
+
+    .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px; overflow-y: auto; padding: 10px; }
+    .gallery-item { background: white; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
+    .gallery-item img { width: 100%; height: 120px; object-fit: cover; }
+    .gallery-meta { padding: 8px; font-size: 10px; display: flex; justify-content: space-between; background: #f8fafc; }
+</style>
+
+<div id="deepDiveModal" class="modal-overlay" onclick="hideModal('deepDiveModal')" style="display:none;">
+    <div class="modal" style="width: 1100px; max-height: 90vh;" onclick="event.stopPropagation()">
+        <div class="section-header" style="margin-bottom: 25px;">
+            <div>
+                <h3 id="dd-student-name">Student Name</h3>
+                <p id="dd-session-id" style="font-size: 12px; color: var(--text-secondary)"></p>
+            </div>
+            <div style="display:flex; gap:10px;">
+                <button class="btn btn-outline" style="color:var(--danger); border-color:var(--danger);" onclick="showInterventionPanel()">⚠️ Send Warning</button>
+                <button class="btn btn-outline" onclick="exportSessionReport()">Export PDF Report</button>
+            </div>
+        </div>
+        
+        <div id="intervention-panel" style="display:none; background:#fff1f2; border:1px solid #fecaca; padding:15px; border-radius:12px; margin-bottom:20px; animation: slideDown 0.3s;">
+            <h4 style="margin-bottom:10px; color:#991b1b; font-size:13px;">Proctor Intervention</h4>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+                <button class="btn btn-outline btn-sm" style="font-size:11px;" onclick="sendIntervention('Please adjust your lighting.')">Adjust Lighting</button>
+                <button class="btn btn-outline btn-sm" style="font-size:11px;" onclick="sendIntervention('Center your face in the frame.')">Center Face</button>
+                <button class="btn btn-outline btn-sm" style="font-size:11px;" onclick="sendIntervention('Warning: Suspicious behavior detected.')">Suspicious Behavior</button>
+                <button class="btn btn-outline btn-sm" style="font-size:11px;" onclick="sendIntervention('Please remain focused on the screen.')">Stay Focused</button>
+            </div>
+            <div style="display:flex; gap:8px;">
+                <input type="text" id="custom-warning" placeholder="Type custom message..." style="flex:1; padding:8px; border:1px solid #ddd; border-radius:6px; font-size:13px;">
+                <button class="btn btn-primary btn-sm" onclick="sendIntervention(document.getElementById('custom-warning').value)">Send</button>
+                <button class="btn btn-outline btn-sm" onclick="hideInterventionPanel()">Cancel</button>
+            </div>
+        </div>
+
+        <div class="dd-grid">
+            <div>
+                <h4 class="stat-label">Violation Timeline</h4>
+                <div id="timeline-list" class="timeline-list"></div>
+            </div>
+            <div>
+                <h4 class="stat-label">Snapshot Evidence Gallery</h4>
+                <div id="gallery-grid" class="gallery-grid"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<style>
+    /* Designer Modal Layout Overrides */
+    .designer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 20px; }
+    .designer-pane { 
+        background: #f8fafc; border: 1px solid var(--border); border-radius: 12px; 
+        height: 500px; display: flex; flex-direction: column; overflow: hidden;
+    }
+    .pane-header { padding: 15px 20px; background: white; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .pane-list { flex: 1; overflow-y: auto; padding: 15px; }
+    .designer-card { 
+        background: white; border: 1px solid var(--border); border-radius: 8px; padding: 12px;
+        margin-bottom: 10px; cursor: pointer; transition: all 0.2s; 
+        display: flex; justify-content: space-between; align-items: center;
+    }
+    .designer-card:hover { border-color: var(--primary); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    .designer-card .type { font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; margin-right: 8px; }
+    .type-mcq { background: #dcfce7; color: #166534; }
+    .type-code { background: #e0e7ff; color: #4338ca; }
+</style>
+
+<div id="designerModal" class="modal-overlay" style="display:none;" onclick="hideModal('designerModal')">
+    <div class="modal" style="width: 900px; max-width: 95vw;" onclick="event.stopPropagation()">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2 style="margin:0;">Exam Structure Designer</h2>
+            <button class="btn btn-primary" onclick="saveStructure()">Save Layout</button>
+        </div>
+
+        <div class="designer-grid">
+            <div class="designer-pane">
+                <div class="pane-header">
+                    <span style="font-weight:700; font-size:12px; text-transform:uppercase;">Repository Bank</span>
+                    <input type="text" id="designer-search" placeholder="Search..." style="width:120px; font-size:12px; padding:4px; border:1px solid #ddd; border-radius:4px;" onkeyup="renderDesigner()">
+                </div>
+                <div class="pane-list" id="designer-bank"></div>
+            </div>
+
+            <div class="designer-pane" style="border-left: 2px dashed var(--border);">
+                <div class="pane-header">
+                    <span style="font-weight:700; font-size:12px; text-transform:uppercase; color:var(--primary);">Active Exam Flow</span>
+                </div>
+                <div class="pane-list" id="designer-active"></div>
+            </div>
+        </div>
+
+        <div style="margin-top:20px; text-align: right;">
+            <button class="btn btn-outline" onclick="hideModal('designerModal')">Cancel</button>
+        </div>
+    </div>
+</div>
+
+
+</body>
+</html>

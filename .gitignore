@@ -18,3 +18,28 @@ __pycache__/
 
 # ---- OS ----
 .DS_Store
+Thumbs.db
+
+# ---- SYSTEM DEPENDENCIES (NEVER COMMIT) ----
+node_modules/
+dist/
+build/
+.env
+.env.local
+.env.*.local
+
+# ---- PYTHON DEPENDENCIES ----
+venv/
+env/
+.venv/
+.env/
+bin/
+lib/
+include/
+pip-wheel-metadata/
+
+# ---- MODEL OUTPUTS ----
+*.pth
+*.pt
+ml/models/*.pth
+ml/models/*.pt

@@ -11,6 +11,7 @@ from proctoring_ml_module.engines.uc2_engine import UC2Engine
 from proctoring_ml_module.engines.uc3_engine import UC3PresenceEngine
 from proctoring_ml_module.engines.uc4_engine import UC4Engine
 from proctoring_ml_module.engines.uc5_engine import UC5Engine
+from proctoring_ml_module.engines.uc6_engine import UC6Engine
 from ml.engines.gam_engine import GAMEngine
 from ml.engines.hgdm_engine import HGDMEngine
 from proctoring_ml_module.models.architectures import GAM, HGDM
@@ -31,47 +32,48 @@ class ProctoringEngine:
         with open(config_path, 'r') as f:
             self.config = yaml.safe_load(f)
 
-        print(f"[ProctoringEngine] Loaded from: {__file__}")
-        print("[ProctoringEngine] Initializing Engines...")
+        print(f"[ProctoringEngine] Loading from: {__file__}")
+        print("[ProctoringEngine] Initializing 7-Signal Core...")
 
+        print("      - [1/7] Identity (ResNet)...")
         self.uc1 = UC1Engine(self.config)
+        
+        print("      - [2/7] Instability (LSTM)...")
         self.uc2 = UC2Engine(self.config)
+        
+        print("      - [3/7] Presence (UC3)...")
         self.uc3 = UC3PresenceEngine(self.config)
         
+        print("      - [4/7] Drift (UC4)...")
         uc4_path = os.path.join(self.config.get('model_dir', 'proctoring_ml_module/models'), 'uc4_drift_model.pth')
         self.uc4 = UC4Engine(uc4_path)
         
+        print("      - [5/7] Gaze (GAM)...")
         # Phase 17: GAM Engine
         gam_model = GAM()
         gam_path = os.path.join(self.config.get('model_dir', 'proctoring_ml_module/models'), 'gam_model.pth')
         if os.path.exists(gam_path):
             gam_model.load_state_dict(torch.load(gam_path, map_location='cpu'))
-            print(f"[ProctoringEngine] GAM weights loaded from {gam_path}")
-        else:
-            print("[ProctoringEngine] WARNING: GAM weights not found. Using untrained base.")
-            
         self.gam = GAMEngine(gam_model, device=self.config.get('inference', {}).get('device', 'cpu'))
 
+        print("      - [6/7] Head-Pose (HGDM)...")
         # Phase 18: HGDM Engine
         hgdm_model = HGDM()
         hgdm_path = os.path.join(self.config.get('model_dir', 'proctoring_ml_module/models'), 'hgdm_model.pth')
         if os.path.exists(hgdm_path):
             hgdm_model.load_state_dict(torch.load(hgdm_path, map_location='cpu'))
-            print(f"[ProctoringEngine] HGDM weights loaded from {hgdm_path}")
-        else:
-            print("[ProctoringEngine] WARNING: HGDM weights not found. Using untrained base.")
-            
         self.hgdm = HGDMEngine(device=self.config.get('inference', {}).get('device', 'cpu'))
-        # Overwrite with loaded model
         self.hgdm.model = hgdm_model.to(self.hgdm.device)
         self.hgdm.model.eval()
 
+        print("      - [7/7] Fusion & Audio (UC5/6)...")
         self.uc5 = UC5Engine(self.config)
+        self.uc6 = UC6Engine(self.config)
 
         self.enrollment_embedding = None
         self.session_active = False
 
-        print("[ProctoringEngine] Ready.")
+        print("[ProctoringEngine] 7-Signal Sentinel Ready.")
 
     # ==========================================================
     # -------------------- SESSION START ------------------------
@@ -97,6 +99,7 @@ class ProctoringEngine:
         self.gam.reset()
         self.hgdm.reset()
         self.uc5.reset()
+        self.uc6.reset()
 
         self.session_active = True
 
@@ -107,7 +110,7 @@ class ProctoringEngine:
     # -------------------- FRAME PROCESSING --------------------
     # ==========================================================
 
-    def process_frame(self, frame_input, uc3_features=None, gaze_features=None):
+    def process_frame(self, frame_input, uc3_features=None, gaze_features=None, audio_features=None):
         """
         Process a live camera frame.
 
@@ -125,6 +128,7 @@ class ProctoringEngine:
                 "uc4_drift": float,
                 "gam_gaze": float,
                 "hgdm_prob": float,
+                "uc6_audio": float,
                 "risk": float,
                 "uncertainty": float
             }
@@ -148,6 +152,7 @@ class ProctoringEngine:
                 "uc4_drift": 1.0,
                 "gam_gaze": 0.5,
                 "hgdm_prob": 0.5,
+                "uc6_audio": 0.9,
                 "risk": 1.0,
                 "uncertainty": 1.0
             }
@@ -205,7 +210,15 @@ class ProctoringEngine:
             h_t_prob = self.hgdm.update(head_pose, gaze_features)
 
         # ------------------------------------------------------
-        # UC5 — Risk Fusion (Now 6-Signal)
+        # UC6 — Acoustic Anomaly Detection (Phase 19)
+        # ------------------------------------------------------
+        
+        audio_prob = 0.5
+        if audio_features is not None:
+            audio_prob = self.uc6.update(float(audio_features))
+
+        # ------------------------------------------------------
+        # UC5 — Risk Fusion (Sentinel 7-Signal Suite)
         # ------------------------------------------------------
 
         risk, uncertainty = self.uc5.update(
@@ -214,7 +227,8 @@ class ProctoringEngine:
             presence_prob,
             uc4_drift,
             g_t_prob,
-            h_t_prob
+            h_t_prob,
+            audio_prob
         )
 
         print(
@@ -224,6 +238,7 @@ class ProctoringEngine:
             f"Drift: {uc4_drift:.4f} | "
             f"Gaze: {g_t_prob:.4f} | "
             f"HGDM: {h_t_prob:.4f} | "
+            f"Audio: {audio_prob:.4f} | "
             f"Risk: {risk:.4f} | "
             f"Uncertainty: {uncertainty:.4f}"
         )
@@ -235,6 +250,7 @@ class ProctoringEngine:
             "uc4_drift": uc4_drift,
             "gam_gaze": g_t_prob,
             "hgdm_prob": h_t_prob,
+            "uc6_audio": audio_prob,
             "risk": risk,
             "uncertainty": uncertainty
         }

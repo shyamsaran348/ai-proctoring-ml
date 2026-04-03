@@ -12,9 +12,14 @@ models:
     num_layers: 2
   uc5:
     path: "proctoring_ml_module/models/uc5_risk_gru_v3.pth"
-    input_dim: 6
+    input_dim: 7
     hidden_dim: 32
     max_history: 300
+  uc6:
+    path: "proctoring_ml_module/models/uc6_audio.pth"
+    hidden_dim: 32
+    max_history: 150
+    threshold: 0.6
   gam:
     path: "proctoring_ml_module/models/gam_model.pth"
     input_dim: 6

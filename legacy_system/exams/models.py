@@ -102,10 +102,9 @@ class Contest(models.Model):
     ]
     
     CONTEST_TYPE = [
-        ('practice', 'Practice'),
-        ('rated', 'Rated Contest'),
-        ('unrated', 'Unrated Contest'),
-        ('virtual', 'Virtual Contest'),
+        ('coding', 'Coding Only'),
+        ('mcq', 'MCQ Only'),
+        ('hybrid', 'Hybrid (Coding + MCQ)'),
     ]
     
     VISIBILITY = [
@@ -126,7 +125,7 @@ class Contest(models.Model):
     
     # Configuration
     status = models.CharField(max_length=20, choices=CONTEST_STATUS, default='upcoming')
-    contest_type = models.CharField(max_length=20, choices=CONTEST_TYPE, default='rated')
+    contest_type = models.CharField(max_length=20, choices=CONTEST_TYPE, default='coding')
     visibility = models.CharField(max_length=20, choices=VISIBILITY, default='public')
     
     # Limits
@@ -139,7 +138,13 @@ class Contest(models.Model):
     
     # Creator and timestamps
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='contests_created')
+    problems = models.ManyToManyField('Problem', through='ContestProblem', related_name='contests', blank=True)
+    order_mcqs = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+
+
     updated_at = models.DateTimeField(auto_now=True)
     
     # Proctoring settings
@@ -308,11 +313,15 @@ class ExamSession(models.Model):
     session_id = models.CharField(max_length=64, unique=True)
     problem = models.ForeignKey(Problem, on_delete=models.CASCADE, related_name="exam_sessions", null=True, blank=True)
     contest = models.ForeignKey('Contest', on_delete=models.CASCADE, related_name="exam_sessions", null=True, blank=True)
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name="exam_sessions", null=True, blank=True)
+    marks_obtained = models.IntegerField(default=0)
     start_time = models.DateTimeField(auto_now_add=True, null=True, blank=True)
+
     end_time = models.DateTimeField(null=True, blank=True)
     time_remaining = models.IntegerField(default=0)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
     is_submitted = models.BooleanField(default=False)
+    last_command = models.CharField(max_length=50, default='NONE') # For real-time instructions
     suspicious_activities = models.JSONField(default=list, blank=True)
     tab_switches = models.IntegerField(default=0)
     copy_paste_attempts = models.IntegerField(default=0)
@@ -357,6 +366,7 @@ class Submission(models.Model):
     def __str__(self):
         return f"Submission {self.id} - {self.status}"
 
+
 class TestResult(models.Model):
     submission = models.ForeignKey('Submission', on_delete=models.CASCADE, related_name='test_results')
     test_case = models.ForeignKey('TestCase', on_delete=models.CASCADE)
@@ -370,7 +380,6 @@ class TestResult(models.Model):
 
     class Meta:
         ordering = ['id']
-
 
 
 class ProctoringSession(models.Model):
@@ -408,6 +417,23 @@ class ProctoringSession(models.Model):
         return f"Proctoring {self.session_id}"
 
 
+class ProctoringRecord(models.Model):
+    """Granular record of a single proctoring frame/event"""
+    session = models.ForeignKey(ExamSession, on_delete=models.CASCADE, related_name='proctoring_records')
+    timestamp = models.DateTimeField(auto_now_add=True)
+    risk_score = models.FloatField(default=0.0)
+    violation_type = models.CharField(max_length=100, null=True, blank=True)
+    frame_path = models.CharField(max_length=255, null=True, blank=True)
+    meta_data = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ['timestamp']
+
+    def __str__(self):
+        return f"Record {self.id} - {self.session.session_id} - {self.risk_score}"
+
+
+
 class CodeSimilarity(models.Model):
     """Code similarity detection for plagiarism"""
     submission1 = models.ForeignKey(
@@ -433,4 +459,49 @@ class CodeSimilarity(models.Model):
         unique_together = ['submission1', 'submission2']
 
 
+class ContestProblem(models.Model):
+    """Through model for ordered problems in a contest"""
+    contest = models.ForeignKey(Contest, on_delete=models.CASCADE)
+    problem = models.ForeignKey('Problem', on_delete=models.CASCADE)
+    order = models.PositiveIntegerField(default=0)
+    time_limit_override = models.IntegerField(null=True, blank=True)
 
+    class Meta:
+        ordering = ['order']
+        unique_together = ['contest', 'problem']
+
+
+
+class MCQQuestion(models.Model):
+    """Multiple Choice Question associated with a contest"""
+    contest = models.ForeignKey(Contest, on_delete=models.CASCADE, related_name='mcqs', null=True, blank=True)
+
+    question_text = models.TextField()
+    options = models.JSONField(help_text="List of strings for options")
+    correct_option = models.IntegerField(help_text="0-indexed correct option")
+    marks = models.IntegerField(default=1)
+    order = models.PositiveIntegerField(default=0)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    
+    def __str__(self):
+        return f"MCQ: {self.question_text[:50]}..."
+
+
+class MCQSubmission(models.Model):
+    """Student submission for an MCQ"""
+    exam_session = models.ForeignKey(ExamSession, on_delete=models.CASCADE, related_name='mcq_submissions')
+    student = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
+
+    question = models.ForeignKey(MCQQuestion, on_delete=models.CASCADE)
+    selected_option = models.IntegerField(null=True, blank=True)
+    is_correct = models.BooleanField(default=False)
+    
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ['exam_session', 'question']
+
+    def __str__(self):
+        return f"{self.student.username} - {self.question.id}"

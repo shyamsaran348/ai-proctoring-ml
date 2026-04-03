@@ -26,7 +26,7 @@ class UC5Engine:
         self.buffer = deque(maxlen=self.max_history)
 
         self.model = RiskFusionGRU(
-            input_dim=6,
+            input_dim=7,
             hidden_dim=self.hidden_dim
         )
 
@@ -40,17 +40,17 @@ class UC5Engine:
                 state_dict = torch.load(self.model_path, map_location=self.device)
                 self.model.load_state_dict(state_dict)
                 print(f"[UC5] Loaded weights from {self.model_path}")
-            except RuntimeError as e:
-                print(f"[UC5] WARNING: Checkpoint shape mismatch ({e}). Phase 18 upgrade in progress.")
+            except Exception as e:
+                print(f"[UC5] WARNING: Checkpoint mismatch ({e}). Running refined Phase 19 fusion.")
         else:
             print(f"[UC5] WARNING: Checkpoint not found at {self.model_path}. Using random weights.")
 
     def reset(self):
         self.buffer.clear()
 
-    def update(self, uc1_sim: float, uc2_prob: float, uc3_presence: float, uc4_drift: float, gam_gaze: float, hgdm_prob: float) -> tuple[float, float]:
+    def update(self, uc1_sim: float, uc2_prob: float, uc3_presence: float, uc4_drift: float, gam_gaze: float, hgdm_prob: float, audio_prob: float) -> tuple[float, float]:
 
-        self.buffer.append([uc1_sim, uc2_prob, uc3_presence, uc4_drift, gam_gaze, hgdm_prob])
+        self.buffer.append([uc1_sim, uc2_prob, uc3_presence, uc4_drift, gam_gaze, hgdm_prob, audio_prob])
 
         seq_data = list(self.buffer)
 

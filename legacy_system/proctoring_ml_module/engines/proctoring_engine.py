@@ -8,111 +8,251 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'
 
 from proctoring_ml_module.engines.uc1_engine import UC1Engine
 from proctoring_ml_module.engines.uc2_engine import UC2Engine
+from proctoring_ml_module.engines.uc3_engine import UC3PresenceEngine
+from proctoring_ml_module.engines.uc4_engine import UC4Engine
 from proctoring_ml_module.engines.uc5_engine import UC5Engine
+from proctoring_ml_module.engines.uc6_engine import UC6Engine
+from ml.engines.gam_engine import GAMEngine
+from ml.engines.hgdm_engine import HGDMEngine
+from proctoring_ml_module.models.architectures import GAM, HGDM
+
 
 class ProctoringEngine:
     def __init__(self, config_path=None):
+
         if config_path is None:
-            # Default to config.yaml in module root
-            config_path = os.path.join(os.path.dirname(__file__), '../config.yaml')
-            
+            config_path = os.path.join(
+                os.path.dirname(__file__),
+                '../config.yaml'
+            )
+
         if not os.path.exists(config_path):
-             raise FileNotFoundError(f"Config file not found: {config_path}")
+            raise FileNotFoundError(f"Config file not found: {config_path}")
 
         with open(config_path, 'r') as f:
             self.config = yaml.safe_load(f)
 
-        print("[ProctoringEngine] Initializing Engines...")
+        print(f"[ProctoringEngine] Loading from: {__file__}")
+        print("[ProctoringEngine] Initializing 7-Signal Core...")
+
+        print("      - [1/7] Identity (ResNet)...")
         self.uc1 = UC1Engine(self.config)
-        self.uc2 = UC2Engine(self.config)
-        self.uc5 = UC5Engine(self.config)
         
+        print("      - [2/7] Instability (LSTM)...")
+        self.uc2 = UC2Engine(self.config)
+        
+        print("      - [3/7] Presence (UC3)...")
+        self.uc3 = UC3PresenceEngine(self.config)
+        
+        print("      - [4/7] Drift (UC4)...")
+        uc4_path = os.path.join(self.config.get('model_dir', 'proctoring_ml_module/models'), 'uc4_drift_model.pth')
+        self.uc4 = UC4Engine(uc4_path)
+        
+        print("      - [5/7] Gaze (GAM)...")
+        # Phase 17: GAM Engine
+        gam_model = GAM()
+        gam_path = os.path.join(self.config.get('model_dir', 'proctoring_ml_module/models'), 'gam_model.pth')
+        if os.path.exists(gam_path):
+            gam_model.load_state_dict(torch.load(gam_path, map_location='cpu'))
+        self.gam = GAMEngine(gam_model, device=self.config.get('inference', {}).get('device', 'cpu'))
+
+        print("      - [6/7] Head-Pose (HGDM)...")
+        # Phase 18: HGDM Engine
+        hgdm_model = HGDM()
+        hgdm_path = os.path.join(self.config.get('model_dir', 'proctoring_ml_module/models'), 'hgdm_model.pth')
+        if os.path.exists(hgdm_path):
+            hgdm_model.load_state_dict(torch.load(hgdm_path, map_location='cpu'))
+        self.hgdm = HGDMEngine(device=self.config.get('inference', {}).get('device', 'cpu'))
+        self.hgdm.model = hgdm_model.to(self.hgdm.device)
+        self.hgdm.model.eval()
+
+        print("      - [7/7] Fusion & Audio (UC5/6)...")
+        self.uc5 = UC5Engine(self.config)
+        self.uc6 = UC6Engine(self.config)
+
         self.enrollment_embedding = None
         self.session_active = False
-        print("[ProctoringEngine] Ready.")
+
+        print("[ProctoringEngine] 7-Signal Sentinel Ready.")
+
+    # ==========================================================
+    # -------------------- SESSION START ------------------------
+    # ==========================================================
 
     def start_session(self, enrollment_image_input):
         """
-        Start a new proctoring session.
-        Args:
-            enrollment_image_input: Path, PIL Image, or Numpy array of the enrollment face.
+        Start a new proctoring session (STRICT ONE-SHOT ENROLLMENT).
         """
-        # 1. Compute Enrollment Embedding (One-Shot)
-        emb = self.uc1.get_embedding(enrollment_image_input)
-        if emb is None:
-            raise ValueError("Failed to compute enrollment embedding. check image.")
-        
-        self.enrollment_embedding = emb
-        
-        # 2. Reset Temporal Engines
-        self.uc2.reset()
-        self.uc5.reset()
-        
-        self.session_active = True
-        print("[ProctoringEngine] Session Started. Enrollment embedding fixed.")
 
-    def process_frame(self, frame_input):
+        # One-shot enrollment (immutable)
+        emb = self.uc1.get_embedding(enrollment_image_input)
+
+        if emb is None:
+            raise ValueError("Failed to compute enrollment embedding.")
+
+        self.enrollment_embedding = emb
+
+        # Reset temporal models
+        self.uc2.reset()
+        self.uc3.reset()
+        self.uc4.reset()
+        self.gam.reset()
+        self.hgdm.reset()
+        self.uc5.reset()
+        self.uc6.reset()
+
+        self.session_active = True
+
+        print("[ProctoringEngine] Session Started.")
+        print("[ProctoringEngine] Enrollment embedding fixed (immutable).")
+
+    # ==========================================================
+    # -------------------- FRAME PROCESSING --------------------
+    # ==========================================================
+
+    def process_frame(self, frame_input, uc3_features=None, gaze_features=None, audio_features=None):
         """
         Process a live camera frame.
+
         Args:
-            frame_input: Path, PIL Image, or Numpy array.
+            frame_input: Path, PIL Image, or Numpy array
+            uc3_features: numpy array (6,) for UC3 temporal presence modeling
+            gaze_features: numpy array (6,) for Phase 17 GAM gaze modeling
+
         Returns:
-            dict: {
+            dict:
+            {
                 "uc1_similarity": float,
                 "uc2_instability": float,
-                "risk": float
+                "uc3_presence": float or None,
+                "uc4_drift": float,
+                "gam_gaze": float,
+                "hgdm_prob": float,
+                "uc6_audio": float,
+                "risk": float,
+                "uncertainty": float
             }
         """
+
         if not self.session_active or self.enrollment_embedding is None:
-            raise RuntimeError("Session not started. Call start_session() first.")
+            raise RuntimeError("Session not started.")
 
-        # UC1: Identity Check
+        # ------------------------------------------------------
+        # UC1 — Identity Embedding
+        # ------------------------------------------------------
+
         probe_emb = self.uc1.get_embedding(frame_input)
-        if probe_emb is None:
-            # If face detection fails or image is bad, what do we do?
-            # Return high risk? Or skip?
-            # Phase 8 says monitoring module... 
-            # If we assume input is a cropped face (Model-First, face detection happened outside OR inside?)
-            # Prompt: "Inputs: Live camera frames (or frame paths)". 
-            # UC1 expects a FACE. If full frame, ResNet might fail to find face?
-            # User context says: "Dataset construction logic... identity-level data splitting". "This Repository DOES NOT CONTAIN... Webcam capture logic".
-            # Usually strict proctoring assumes input is a aligned face.
-            # But the prompt says "Live camera frames".
-            # For this module, we will assume the input *contains* the face or is the face.
-            # ResNet over a full room image won't work well for identity. 
-            # *Assuming strict constraint*: The input should be a face crop.
-            # If `get_embedding` fails, we might return None or zeros.
-            # Let's return default high risk or 0 similarity?
-            # To be safe, we'll raise warning and return last known or defaults.
-             print("Warning: Could not extract embedding from frame.")
-             return {
-                 "uc1_similarity": 0.0,
-                 "uc2_instability": 1.0, # High instability
-                 "risk": 1.0 # High risk
-             }
 
-        uc1_sim = self.uc1.compute_similarity(self.enrollment_embedding, probe_emb)
-        
-        # UC2: Temporal Instability
+        if probe_emb is None:
+            print("Warning: Could not extract embedding from frame.")
+            return {
+                "uc1_similarity": 0.0,
+                "uc2_instability": 1.0,
+                "uc3_presence": 0.0,
+                "uc4_drift": 1.0,
+                "gam_gaze": 0.5,
+                "hgdm_prob": 0.5,
+                "uc6_audio": 0.9,
+                "risk": 1.0,
+                "uncertainty": 1.0
+            }
+
+        uc1_sim = self.uc1.compute_similarity(
+            self.enrollment_embedding,
+            probe_emb
+        )
+
+        # ------------------------------------------------------
+        # UC2 — Temporal Identity Instability
+        # ------------------------------------------------------
+
         uc2_prob = self.uc2.update(uc1_sim)
+
+        # ------------------------------------------------------
+        # UC3 — Presence & Attentiveness
+        # ------------------------------------------------------
+
+        presence_prob = None
+
+        if uc3_features is not None:
+            presence_prob = self.uc3.update(uc3_features)
+
+        # If buffer not full yet, treat as neutral signal (do NOT force rules)
+        if presence_prob is None:
+            presence_prob = 0.5
+
+        # ------------------------------------------------------
+        # UC4 — Long-Term Identity Drift
+        # ------------------------------------------------------
+
+        probe_vec = probe_emb.cpu().numpy().flatten()
+        enroll_vec = self.enrollment_embedding.cpu().numpy().flatten()
+        delta_vector = probe_vec - enroll_vec
+
+        uc4_drift = self.uc4.update(delta_vector, uc1_sim)
         
-        # UC5: Risk Fusion
-        # UC5: Risk Fusion
-        risk = self.uc5.update(uc1_sim, uc2_prob)
+        # ------------------------------------------------------
+        # GAM — Eye Gaze Modeling (Phase 17)
+        # ------------------------------------------------------
         
-        # ---------------------------------------------------------
-        # SAFETY CLAMP: Override GRU if Similarity is High
-        # ---------------------------------------------------------
-        if uc1_sim > 0.65:
-            # User is clearly present and matching.
-            # Force risk down significantly, but keep slight variance for liveness feel.
-            risk = 0.1
-        elif uc1_sim > 0.5:
-             # Ambiguous zone, dampen the risk
-             risk = min(risk, 0.4)
+        g_t_prob = 0.5
+        if gaze_features is not None:
+            g_t_prob = self.gam.update(gaze_features)
+
+        # ------------------------------------------------------
+        # HGDM — Head-Gaze Dynamics (Phase 18)
+        # ------------------------------------------------------
         
+        h_t_prob = 0.5
+        if uc3_features is not None and gaze_features is not None:
+            # uc3_features index 2,3,4 are yaw, pitch, roll
+            head_pose = uc3_features[2:5]
+            h_t_prob = self.hgdm.update(head_pose, gaze_features)
+
+        # ------------------------------------------------------
+        # UC6 — Acoustic Anomaly Detection (Phase 19)
+        # ------------------------------------------------------
+        
+        audio_prob = 0.5
+        if audio_features is not None:
+            audio_prob = self.uc6.update(float(audio_features))
+
+        # ------------------------------------------------------
+        # UC5 — Risk Fusion (Sentinel 7-Signal Suite)
+        # ------------------------------------------------------
+
+        risk, uncertainty = self.uc5.update(
+            uc1_sim,
+            uc2_prob,
+            presence_prob,
+            uc4_drift,
+            g_t_prob,
+            h_t_prob,
+            audio_prob
+        )
+
+        print(
+            f"[Engine] Sim: {uc1_sim:.4f} | "
+            f"Instability: {uc2_prob:.4f} | "
+            f"Presence: {presence_prob:.4f} | "
+            f"Drift: {uc4_drift:.4f} | "
+            f"Gaze: {g_t_prob:.4f} | "
+            f"HGDM: {h_t_prob:.4f} | "
+            f"Audio: {audio_prob:.4f} | "
+            f"Risk: {risk:.4f} | "
+            f"Uncertainty: {uncertainty:.4f}"
+        )
+
         return {
             "uc1_similarity": uc1_sim,
             "uc2_instability": uc2_prob,
-            "risk": risk
+            "uc3_presence": presence_prob,
+            "uc4_drift": uc4_drift,
+            "gam_gaze": g_t_prob,
+            "hgdm_prob": h_t_prob,
+            "uc6_audio": audio_prob,
+            "risk": risk,
+            "uncertainty": uncertainty
         }
+
+    

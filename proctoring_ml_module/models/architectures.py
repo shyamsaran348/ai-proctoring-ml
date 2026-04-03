@@ -93,21 +93,42 @@ class HGDM(nn.Module):
 
 
 # ---------------------------------------------------------
-# UC5: Risk Fusion GRU (6-Signal Version - Phase 18)
+# UC6: Audio Anomaly Detection (Phase 19)
+# ---------------------------------------------------------
+class UC6AudioNet(nn.Module):
+    """
+    Sequence-based audio anomaly detector.
+    Input: (B, T, 1) - amplitude/volume levels
+    """
+    def __init__(self, hidden_dim=32, num_layers=1):
+        super().__init__()
+        self.lstm = nn.LSTM(1, hidden_dim, num_layers, batch_first=True)
+        self.fc = nn.Linear(hidden_dim, 1)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        _, (h_n, _) = self.lstm(x)
+        out = self.fc(h_n[-1])
+        return self.sigmoid(out)
+
+
+# ---------------------------------------------------------
+# UC5: Risk Fusion GRU (7-Signal Version - Phase 19)
 # ---------------------------------------------------------
 class RiskFusionGRU(nn.Module):
     """
-    GRU-based risk fusion model (Phase 18).
+    GRU-based risk fusion model (Phase 19).
 
     Input:
-        x: Tensor of shape (B, T, 6)
+        x: Tensor of shape (B, T, 7)
            features = [
                UC1_similarity,
                UC2_instability_prob,
                UC3_presence_prob,
                UC4_drift_prob,
                GAM_gaze_prob,
-               HGDM_head_gaze_prob
+               HGDM_head_gaze_prob,
+               UC6_audio_prob
            ]
 
     Output:
@@ -115,7 +136,7 @@ class RiskFusionGRU(nn.Module):
         final_risk: (B,)
     """
 
-    def __init__(self, input_dim=6, hidden_dim=32):
+    def __init__(self, input_dim=7, hidden_dim=32):
         super().__init__()
 
         self.hidden_dim = hidden_dim
