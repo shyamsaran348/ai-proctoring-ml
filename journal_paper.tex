@@ -131,6 +131,26 @@ To further approximate real-world environmental conditions, the generative pipel
 \end{enumerate}
 This multi-layered data generation strategy ensures that the TBIE is trained and evaluated on data that is both technically controlled and behaviorally authentic, providing a robust testbed for temporal fusion.
 
+\subsection{Data Preprocessing, Augmentation, and Robustness Training}
+\label{subsec:preprocessing_aug}
+
+To ensure that the neural models generalize effectively under diverse real-world environmental settings---characterized by suboptimal camera qualities, challenging illumination conditions, ambient acoustic disturbances, and subject movements---we implement a multi-modal preprocessing and data augmentation pipeline during the training phase.
+
+\subsubsection{Visual Preprocessing and Geometric Alignment}
+For all webcam-based image sequences, raw frames are first processed using a Multi-Task Cascaded Convolutional Network (MTCNN) to isolate the primary facial bounding box. To eliminate confounding variance introduced by subject-to-camera rotation (head roll), we apply an affine transformation mapping the five detected facial landmarks (left eye, right eye, nose tip, left mouth corner, right mouth corner) to a standardized Euclidean coordinate frame. The aligned crop is subsequently downsampled to $160 \times 160$ pixels and normalized before embedding projection.
+
+\subsubsection{Multi-Modal Data Augmentation}
+Visual and acoustic sequences are dynamically perturbed at each epoch to enforce robust manifold learning:
+\begin{itemize}
+    \item \textbf{Photometric Jittering}: We randomly perturb brightness, contrast, saturation, and hue by up to $\pm 25\%$ of their baseline values, combined with randomized gamma corrections $\gamma \sim \mathcal{U}(0.5, 1.5)$. This simulates variable home-exam lighting, such as incandescent bulbs or intense window glare.
+    \item \textbf{Sensor Degradation}: Webcam sensor noise and low resolution are simulated by applying dynamic Gaussian blur with a standard deviation $\sigma \in [0.1, 2.0]$, alongside additive zero-mean white Gaussian pixel noise $\sigma_{\mathrm{noise}} \sim \mathcal{U}(0, 0.05)$.
+    \item \textbf{Partial Spatial Occlusion}: To prevent the embedding layers from overfitting to pristine facial boundaries, we deploy Random Erasing. A rectangular region spanning $5\%$ to $15\%$ of the facial area is replaced with neutral gray pixels, simulating hand-to-face contemplation, mask-wearing, or extreme glass reflection.
+    \item \textbf{Acoustic Perturbations}: For the acoustic anomaly expert (AAM), continuous microphone audio is augmented in the waveform domain before conversion to 13-dimensional Mel-Frequency Cepstral Coefficients (MFCC). We inject additive stationary ambient hums at Signal-to-Noise Ratios (SNR) ranging from $10\,$dB to $25\,$dB, apply dynamic volume gains scaling by up to $\pm 6\,$dB, and time-stretch the inputs by $\pm 10\%$ to simulate speech cadence variations.
+\end{itemize}
+
+\subsubsection{Hyperparameters and Optimization Protocol}
+The deep sequential models are trained on a high-performance workstation equipped with dual NVIDIA RTX 4090 GPUs. The visual anchor embedder is fine-tuned using a Triplet Margin Loss objective ($m=0.3$) utilizing semi-hard negative mining. The recurrent temporal experts (LSTMs/BiLSTMs) and the Gated Recurrent Fusion Engine (RFE GRU) are optimized utilizing the AdamW optimizer ($\beta_1=0.9$, $\beta_2=0.999$, weight decay $\lambda=10^{-4}$). The initial learning rate is set to $\eta = 10^{-3}$ and modulated via a Cosine Annealing scheduler decaying to $\eta_{\mathrm{min}} = 10^{-5}$ over 150 training epochs. Training is completed using a batch size of 64 sequences (each sequence $T=120$ frames). To prevent overfitting, we apply Spatial Dropout ($p=0.3$) to raw feature vectors, recurrent dropout ($p=0.4$) to hidden transitions, and employ early stopping with a patience of 15 epochs monitored against the validation Brier Score.
+
 \subsection{Ethical and Practical Rationale for Synthetic Modeling}
 
 The reliance on synthetic behavioral modeling for this study---beyond the fixed identity embeddings derived from VGGFace2---is necessitated by the extreme scarcity of publicly available, ground-truth exam integrity datasets. Real-world proctoring data is often proprietary, and existing benchmarks rarely provide the fine-grained, frame-level anomaly labels required for individual expert model validation. Furthermore, significant privacy considerations regarding the storage and processing of student biometric video data make synthetic generation a responsible alternative for developing baseline defensive systems. This approach allows for the deliberate simulation of complex adversarial behaviors---such as sophisticated identity substitution via gradual drift---while maintaining a controlled, reproducible, and ethically sound experimental framework.
