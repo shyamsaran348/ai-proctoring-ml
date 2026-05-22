@@ -8,7 +8,8 @@ headers = {
 }
 
 try:
-    response = requests.post(url, headers=headers)
+    payload = {"student_id": "sentinel_student"}
+    response = requests.post(url, headers=headers, json=payload)
     print(f"Status Code: {response.status_code}")
     print(f"Response: {response.text}")
     

@@ -176,11 +176,16 @@ export default function ExamArena() {
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col font-sans relative">
-       {/* Global Warning Flash Overlay */}
+       {/* Sentinel Boundary Feedback - Global Overlay */}
        <div className={`fixed inset-0 pointer-events-none transition-all duration-1000 z-50 ${riskData.risk >= 0.7 ? 'bg-red-500/10' : 'bg-transparent'}`}>
           {riskData.risk >= 0.9 && (
-             <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-red-600 text-white px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-[0.3em] flex items-center gap-2 shadow-2xl">
-                <AlertTriangle size={14} /> Critical Risk - Monitor Intervening
+             <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-red-600 text-white px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-[0.3em] flex flex-col items-center gap-1 shadow-2xl animate-pulse">
+                <div className="flex items-center gap-2">
+                   <AlertTriangle size={14} /> Critical Risk - Monitor Intervening
+                </div>
+                <div className="text-[8px] opacity-80 tracking-widest bg-black/20 px-2 py-0.5 rounded-full">
+                   Reason: {riskData.violation?.replace(/_/g, ' ') || 'Sustained Anomaly'}
+                </div>
              </div>
           )}
        </div>

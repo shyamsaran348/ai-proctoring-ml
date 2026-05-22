@@ -169,54 +169,60 @@ def architecture():
     orth_arrow(ax, (2.5, 10.95), (2.5, 10.45))
     
     # Live path
-    draw_parallelogram(ax, 8.5, 12.5, 2.5, 0.6, "Live Frame\n$I_t$")
-    draw_rounded_rect(ax, 8.5, 11.3, 2.5, 0.7, "ResNet-50\n(Shared Weights)", bold=True)
-    draw_rect(ax, 8.5, 10.1, 2.5, 0.6, "Probe Embedding\n$e_t$")
-    orth_arrow(ax, (8.5, 12.2), (8.5, 11.65))
-    orth_arrow(ax, (8.5, 10.95), (8.5, 10.4))
+    draw_parallelogram(ax, 7.5, 12.5, 2.3, 0.6, "Live Frame\n$I_t$")
+    draw_rounded_rect(ax, 7.5, 11.3, 2.3, 0.7, "ResNet-50\n(Shared Weights)", bold=True)
+    draw_rect(ax, 7.5, 10.1, 2.3, 0.6, "Probe Embedding\n$e_t$")
+    orth_arrow(ax, (7.5, 12.2), (7.5, 11.65))
+    orth_arrow(ax, (7.5, 10.95), (7.5, 10.4))
     
     # Comparison block
-    draw_rect(ax, 5.5, 10.1, 2.4, 0.6, "Sim $S_t = e_t \\cdot e_0$\nDelta $\\delta_t = e_t - e_0$")
-    orth_arrow(ax, (4.0, 10.1), (4.3, 10.1))
-    orth_arrow(ax, (7.25, 10.1), (6.7, 10.1))
+    draw_rect(ax, 5.0, 10.1, 2.2, 0.6, "Sim $S_t = e_t \\cdot e_0$\nDelta $\\delta_t = e_t - e_0$")
+    orth_arrow(ax, (4.0, 10.1), (3.9, 10.1))
+    orth_arrow(ax, (6.35, 10.1), (6.1, 10.1))
+
+    # Raw Audio block
+    draw_parallelogram(ax, 9.8, 10.1, 1.6, 0.6, "Raw Audio\n$A_t^{\\mathrm{raw}}$")
     
-    # ── Layer 2: Temporal Modeling (5 experts) ──
+    # ── Layer 2: Temporal Modeling (6 experts) ──
     draw_group_box(ax, 5.5, 6.8, 10.5, 2.8, "Temporal Modeling Layer")
     
-    # 5 expert boxes evenly spaced
-    experts_x = [1.2, 3.3, 5.5, 7.7, 9.8]
+    # 6 expert boxes evenly spaced
+    experts_x = [1.1, 2.85, 4.6, 6.35, 8.1, 9.85]
     experts = [
         "IIM: Instability\n(LSTM, $h$=32)",
         "LDD: Drift\n(BiLSTM, $h$=128)",
         "PAM: Presence\n(BiLSTM, $h$=64)",
         "GAM: Gaze\n(BiLSTM$^2$, $h$=64)",
         "HGDM: Head-Gaze\n(BiLSTM$^2$, $h$=64)",
+        "AAM: Acoustic\n(LSTM, $h$=32)",
     ]
-    outputs = ["$I_t$", "$D_t$", "$P_t$", "$G_t$", "$H_t$"]
+    outputs = ["$U_t$", "$D_t$", "$P_t$", "$G_t$", "$H_t$", "$A_t$"]
     
     for i, (ex, lbl) in enumerate(zip(experts_x, experts)):
-        draw_rounded_rect(ax, ex, 6.8, 1.9, 1.2, lbl)
+        draw_rounded_rect(ax, ex, 6.8, 1.45, 1.2, lbl)
     
     # Clean, non-overlapping routing
-    # IIM gets S_t from comparison block (routed left)
-    ax.plot([4.3, 3.0, 3.0, 1.2, 1.2], [10.1, 10.1, 8.8, 8.8, 7.4], color='black', lw=1.2, zorder=2)
-    ax.annotate('', xy=(1.2, 7.4), xytext=(1.2, 7.41), arrowprops=dict(arrowstyle='->', color='black', lw=1.2, mutation_scale=10), zorder=2)
+    # IIM gets S_t from comparison block
+    ax.plot([3.9, 2.8, 2.8, 1.1, 1.1], [10.1, 10.1, 8.8, 8.8, 7.4], color='black', lw=1.2, zorder=2)
     
-    # LDD gets delta + S from comparison block (straight down)
-    ax.plot([5.5, 5.5, 3.3, 3.3], [9.8, 8.6, 8.6, 7.4], color='black', lw=1.2, zorder=2)
-    ax.annotate('', xy=(3.3, 7.4), xytext=(3.3, 7.41), arrowprops=dict(arrowstyle='->', color='black', lw=1.2, mutation_scale=10), zorder=2)
+    # LDD gets delta + S from comparison block
+    ax.plot([5.0, 5.0, 2.85, 2.85], [9.8, 8.6, 8.6, 7.4], color='black', lw=1.2, zorder=2)
     
-    # PAM gets presence features from Live path (routed straight down)
-    ax.plot([8.5, 8.5, 5.5, 5.5], [9.8, 9.2, 9.2, 7.4], color='black', lw=1.2, zorder=2)
-    ax.annotate('', xy=(5.5, 7.4), xytext=(5.5, 7.41), arrowprops=dict(arrowstyle='->', color='black', lw=1.2, mutation_scale=10), zorder=2)
+    # PAM gets presence features from Live path
+    ax.plot([7.5, 7.5, 4.6, 4.6], [9.8, 9.2, 9.2, 7.4], color='black', lw=1.2, zorder=2)
     
-    # GAM gets gaze features from Live path (routed right)
-    ax.plot([8.7, 8.7, 7.7, 7.7], [9.8, 8.7, 8.7, 7.4], color='black', lw=1.2, zorder=2)
-    ax.annotate('', xy=(7.7, 7.4), xytext=(7.7, 7.41), arrowprops=dict(arrowstyle='->', color='black', lw=1.2, mutation_scale=10), zorder=2)
+    # GAM gets gaze features from Live path
+    ax.plot([7.7, 7.7, 6.35, 6.35], [9.8, 8.7, 8.7, 7.4], color='black', lw=1.2, zorder=2)
     
-    # HGDM gets head-gaze features from Live path (routed far right)
-    ax.plot([9.2, 9.2, 9.8, 9.8], [9.8, 8.9, 8.9, 7.4], color='black', lw=1.2, zorder=2)
-    ax.annotate('', xy=(9.8, 7.4), xytext=(9.8, 7.41), arrowprops=dict(arrowstyle='->', color='black', lw=1.2, mutation_scale=10), zorder=2)
+    # HGDM gets head-gaze features from Live path
+    ax.plot([8.1, 8.1, 8.1, 8.1], [9.8, 8.9, 8.9, 7.4], color='black', lw=1.2, zorder=2)
+
+    # AAM gets raw audio from raw audio block
+    ax.plot([9.8, 9.8, 9.85, 9.85], [9.8, 8.6, 8.6, 7.4], color='black', lw=1.2, zorder=2)
+    
+    # Arrow heads at the end of each route
+    for ex in experts_x:
+        ax.annotate('', xy=(ex, 7.4), xytext=(ex, 7.41), arrowprops=dict(arrowstyle='->', color='black', lw=1.2, mutation_scale=10), zorder=2)
     
     # Signal output labels beneath each expert
     for i, (ex, out) in enumerate(zip(experts_x, outputs)):
@@ -284,16 +290,16 @@ def workflow():
     draw_oval(ax, cx, 9.6, 2.0, 0.6, "Loop $t=1 \\to T$")
     orth_arrow(ax, (cx, 10.4), (cx, 9.9))
     
-    draw_parallelogram(ax, cx, 8.6, 3.5, 0.6, "Capture Live Frame $f_t$")
+    draw_parallelogram(ax, cx, 8.6, 3.5, 0.6, "Capture Live Frame $f_t$ & Audio")
     orth_arrow(ax, (cx, 9.3), (cx, 8.9))
     
-    draw_rect(ax, cx, 7.5, 4.5, 0.8, "Extract Probe $e_t$, $S_t = e_t \\cdot e_0$\nExtract 6D Metadata (Pose, Gaze)")
+    draw_rect(ax, cx, 7.5, 4.5, 0.8, "Extract Probe $e_t$, $S_t = e_t \\cdot e_0$\nExtract Pose, Gaze & Audio Decibels")
     orth_arrow(ax, (cx, 8.3), (cx, 7.9))
     
-    draw_rect(ax, cx, 6.4, 5.0, 0.8, "Update Temporal Windows\nIIM($S_t$), LDD($\\delta_t$), PAM(Presence), GAM(Gaze)")
+    draw_rect(ax, cx, 6.4, 5.0, 0.8, "Update Temporal Windows & Experts\nIIM($S_t$), LDD($\\delta_t$), PAM(Presence), GAM, HGDM, AAM")
     orth_arrow(ax, (cx, 7.1), (cx, 6.8))
     
-    draw_rect(ax, cx, 5.3, 5.0, 0.8, "Update Risk State\nRFE GRU: $(\\rho_t, \\sigma_t) = f(S_t, I_t, P_t, D_t, G_t, H_t)$")
+    draw_rect(ax, cx, 5.3, 5.0, 0.8, "Update Risk State via Recurrent Fusion\nRFE GRU: $(\\rho_t, \\sigma_t) = f(S_t, U_t, P_t, D_t, G_t, H_t, A_t)$")
     orth_arrow(ax, (cx, 6.0), (cx, 5.7))
     
     draw_diamond(ax, cx, 4.1, 2.5, 1.0, "Is $t == T$ ?")
@@ -310,7 +316,7 @@ def workflow():
     orth_arrow(ax, (cx, 3.6), (cx, 2.3))
     ax.text(cx, 3.0, "Yes", ha='center', va='center', fontsize=9, fontweight='bold', bbox=dict(facecolor='white', edgecolor='none', pad=2))
     
-    draw_rect(ax, cx, 1.9, 3.5, 0.8, "Commit Final Risk $(\\rho_T, \\sigma_T)$\n(No Thresholds Applied)")
+    draw_rect(ax, cx, 1.9, 3.5, 0.8, "Commit Final Risk $(\\rho_T, \\sigma_T)$\n(Apply strictness & recovery filters)")
     draw_oval(ax, cx, 0.8, 2.0, 0.6, "Session End")
     orth_arrow(ax, (cx, 1.5), (cx, 1.1))
 

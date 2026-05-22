@@ -1066,16 +1066,36 @@ class ExamSessionViewSet(viewsets.ModelViewSet):
                 proctor.latest_status['last_update'] = time.time()
                 
                 # ─── SENTINEL PRIME: Automated Enforcement (RELAXED FOR TESTING) ───
-                # If risk stays critically high (>0.99) for a sustained period, auto-terminate
-                if proctor.latest_status.get('risk_score', 0) > 0.99:
+                # Support configurable strictness (low, medium, high) from request/params/headers
+                strictness = request.data.get('strictness', request.query_params.get('strictness', 'medium')).lower()
+                if strictness not in ['low', 'medium', 'high']:
+                    strictness = 'medium'
+
+                if strictness == 'low':
+                    risk_threshold = 0.98
+                    strike_limit = 50
+                elif strictness == 'high':
+                    risk_threshold = 0.90
+                    strike_limit = 15
+                else:  # medium
+                    risk_threshold = 0.95
+                    strike_limit = 30
+
+                smoothed_risk = proctor.latest_status.get('risk_score', 0.0)
+                uncertainty = proctor.latest_status.get('uncertainty', 0.0)
+                
+                # Uncertainty Gate: Suppress strikes if model uncertainty is high (>0.25)
+                is_uncertain = uncertainty > 0.25
+
+                if smoothed_risk > risk_threshold and not is_uncertain:
                     if not hasattr(proctor, '_critical_strike_count'):
                         proctor._critical_strike_count = 0
                     proctor._critical_strike_count += 1
                     
-                    if proctor._critical_strike_count >= 25: # ~60-90 seconds of sustained near-total violation
+                    if proctor._critical_strike_count >= strike_limit:
                         session.last_command = 'TERMINATE'
                         session.save(update_fields=['last_command'])
-                        print(f"[Sentinel Prime] AUTO-TERMINATING session {session_id} due to total sustained violation.")
+                        print(f"[Sentinel Prime] AUTO-TERMINATING session {session_id} due to total sustained violation under {strictness} strictness.")
                 else:
                     # Decay the strike count slowly to allow for more flexibility
                     if hasattr(proctor, '_critical_strike_count') and proctor._critical_strike_count > 0:

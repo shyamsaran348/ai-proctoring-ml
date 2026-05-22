@@ -43,7 +43,7 @@ def stress_test_concurrency():
     # Initialize Engine but MOCK the processing time to be slow (0.5s)
     from exams.services.ml_adapter import MLProctoringAdapter
     class SlowProctor(MLProctoringAdapter):
-        def process_external_frame(self, frame_data):
+        def process_external_frame(self, frame_data, audio_volume=0.0):
             try:
                 self.is_processing = True
                 time.sleep(0.5) # Simulate heavy ML work
@@ -58,7 +58,7 @@ def stress_test_concurrency():
     print("Hammering the server with 20 frames in 0.1s...")
     start_time = time.time()
     for i in range(20):
-        client.post(f'/api/sessions/{s_id}/receive_frame/', {'frame': dummy_frame}, format='json')
+        client.post(f'/api/sessions/{s_id}/frame/', {'frame': dummy_frame}, format='json')
     
     duration = time.time() - start_time
     print(f"Hammering took {duration:.2f}s")

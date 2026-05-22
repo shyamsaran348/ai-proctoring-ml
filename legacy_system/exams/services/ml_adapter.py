@@ -82,6 +82,7 @@ class MLProctoringAdapter:
             'uncertainty': 0.0,
             'num_faces': 1,
             'head_pose': 'Monitoring',
+            'violation_type': 'SAFE',
             'face_confidence': 1.0,
             'last_update': time.time(),
             'anomaly_count': 0,
@@ -93,10 +94,15 @@ class MLProctoringAdapter:
         self.anomalies = []
         self.history = []
         self.MAX_HISTORY = 1000 # Keep last 1000 frames (~3.3 mins @ 5fps) for sparklines
+        
+        # ─── Temporal Filtering (Phase 24) ───
+        self.looking_away_counter = 0
+        self.smoothed_risk = 0.0
 
     def start_monitoring(self, student_id, image_path=None):
         self.student_id = student_id
         self.monitoring = True
+        self.looking_away_counter = 0
         try:
             self.face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
             self.profile_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_profileface.xml')
@@ -219,10 +225,22 @@ class MLProctoringAdapter:
                 self.is_processing = False
 
     def _update_status_from_metrics(self, metrics, num_faces, face_locs, looking_away, low_light):
-        sim_score = metrics['uc1_similarity']
+        sim_score = metrics.get('uc1_similarity', metrics.get('uc1_identity_sim', 0.0))
         risk_score = metrics['risk']
+        engine_vtype = metrics.get('violation_type', 'SAFE')
         
         with self.lock:
+            # ─── Temporal Smoothing (EMA) ───
+            self.smoothed_risk = 0.85 * self.smoothed_risk + 0.15 * risk_score
+
+            # ─── Temporal Filtering for Hard Rules ───
+            if looking_away:
+                self.looking_away_counter += 1
+            else:
+                self.looking_away_counter = max(0, self.looking_away_counter - 1)
+            
+            sustained_look_away = self.looking_away_counter >= 5 # ~1.5s at 4fps
+            
             self.latest_status.update({
                 'uc1_identity_sim': sim_score,
                 'uc2_instability': metrics['uc2_instability'],
@@ -231,33 +249,35 @@ class MLProctoringAdapter:
                 'gam_gaze': metrics.get('gam_gaze', 0.5),
                 'hgdm_prob': metrics.get('hgdm_prob', 0.5),
                 'uc6_audio': metrics.get('uc6_audio', 0.5),
-                'risk_score': risk_score,
+                'risk_score': self.smoothed_risk,
+                'raw_risk_score': risk_score,
                 'uncertainty': metrics.get('uncertainty', 0.0),
                 'last_update': time.time(),
                 'is_active': True,
                 'num_faces': num_faces,
                 'face_locations': face_locs,
-                'low_light': low_light
+                'low_light': low_light,
+                'violation_type': engine_vtype
             })
 
-            if risk_score > 0.7:
-                txt = f"HIGH RISK: {risk_score:.2f}"
+            # Status Message Construction
+            if engine_vtype != 'SAFE':
+                txt = engine_vtype.replace('_', ' ')
+                if sustained_look_away:
+                    txt = "PLEASE LOOK AT THE SCREEN"
+                    self.latest_status['risk_score'] = max(self.smoothed_risk, 0.9)
+                    self.latest_status['violation_type'] = 'LOOKING_AWAY'
             elif low_light:
                 txt = "Low Light Detected - Please turn on lights"
-            elif looking_away:
-                txt = "WARNING: LOOKING AWAY"
-                self.latest_status['risk_score'] = max(risk_score, 0.85)
-            elif sim_score < 0.50:
-                txt = f"Identity Mismatch: {sim_score:.2f}"
             elif num_faces == 0:
                 txt = "No Face Detected"
             elif num_faces > 1:
                 txt = "Multiple Faces Detected"
             else:
-                txt = f"ID: {sim_score:.2f} | R: {risk_score:.2f}"
+                txt = f"ID: {sim_score:.2f} | R: {self.smoothed_risk:.2f}"
 
             self.latest_status['head_pose'] = txt
-            self.history.append({'timestamp': time.time(), 'low_light': low_light, **metrics})
+            self.history.append({'timestamp': time.time(), 'low_light': low_light, **metrics, 'smoothed_risk': self.smoothed_risk})
         
         # ─── History Capping (Memory Management) ───
         if len(self.history) > self.MAX_HISTORY:

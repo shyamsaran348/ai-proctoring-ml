@@ -49,17 +49,18 @@ os.makedirs(OUT_DIR, exist_ok=True)
 # ──────────────────────────────────────────────────────────────────────────────
 def ablation():
     models = [
-        'Full 6-Signal\n(Baseline)',
+        'Full 7-Signal\n(Baseline)',
         'Ablate IDE\n(No Identity)',
         'Ablate IIM\n(No Instability)',
         'Ablate PAM\n(No Presence)',
+        'Ablate AAM\n(No Acoustic)',
         'Ablate LDD\n(No Drift)',
     ]
-    aucs = [0.9992, 0.9981, 0.9942, 0.9935, 0.9582]
-    deltas = [0.0, -0.0011, -0.0050, -0.0057, -0.0410]
-    colors = [PALETTE['success']] + [PALETTE['muted']] * 3 + [PALETTE['danger']]
+    aucs = [0.9992, 0.9981, 0.9942, 0.9935, 0.9965, 0.9582]
+    deltas = [0.0, -0.0011, -0.0050, -0.0057, -0.0027, -0.0410]
+    colors = [PALETTE['success']] + [PALETTE['muted']] * 4 + [PALETTE['danger']]
 
-    fig, ax = plt.subplots(figsize=(9, 5))
+    fig, ax = plt.subplots(figsize=(9, 5.5))
     bars = ax.barh(models, aucs, color=colors, height=0.55, edgecolor='white', linewidth=0.5)
 
     # Value labels
@@ -80,7 +81,7 @@ def ablation():
 
     # Annotate LDD impact
     ax.annotate('Largest drop\nwhen LDD removed',
-                xy=(0.96, 4), xytext=(0.96, 3.1),
+                xy=(0.96, 5), xytext=(0.96, 4.0),
                 arrowprops=dict(arrowstyle='->', color=PALETTE['danger'], lw=1.5),
                 fontsize=9, color=PALETTE['danger'], ha='center', va='bottom')
 

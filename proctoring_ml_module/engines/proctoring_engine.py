@@ -62,7 +62,7 @@ class ProctoringEngine:
         hgdm_path = os.path.join(self.config.get('model_dir', 'proctoring_ml_module/models'), 'hgdm_model.pth')
         if os.path.exists(hgdm_path):
             hgdm_model.load_state_dict(torch.load(hgdm_path, map_location='cpu'))
-        self.hgdm = HGDMEngine(device=self.config.get('inference', {}).get('device', 'cpu'))
+        self.hgdm = HGDMEngine(model_path=hgdm_path, device=self.config.get('inference', {}).get('device', 'cpu'))
         self.hgdm.model = hgdm_model.to(self.hgdm.device)
         self.hgdm.model.eval()
 
@@ -72,6 +72,10 @@ class ProctoringEngine:
 
         self.enrollment_embedding = None
         self.session_active = False
+        
+        # ─── Stability Control (Phase 24) ───
+        self.stability_counter = 0 
+        self.stability_threshold = 12 # ~3 seconds of perfect behavior clears memory
 
         print("[ProctoringEngine] 7-Signal Sentinel Ready.")
 
@@ -100,6 +104,7 @@ class ProctoringEngine:
         self.hgdm.reset()
         self.uc5.reset()
         self.uc6.reset()
+        self.stability_counter = 0
 
         self.session_active = True
 
@@ -130,7 +135,8 @@ class ProctoringEngine:
                 "hgdm_prob": float,
                 "uc6_audio": float,
                 "risk": float,
-                "uncertainty": float
+                "uncertainty": float,
+                "violation_type": str
             }
         """
 
@@ -154,7 +160,8 @@ class ProctoringEngine:
                 "hgdm_prob": 0.5,
                 "uc6_audio": 0.9,
                 "risk": 1.0,
-                "uncertainty": 1.0
+                "uncertainty": 1.0,
+                "violation_type": "FACE_NOT_DETECTED"
             }
 
         uc1_sim = self.uc1.compute_similarity(
@@ -218,6 +225,23 @@ class ProctoringEngine:
             audio_prob = self.uc6.update(float(audio_features))
 
         # ------------------------------------------------------
+        # Fast Recovery Logic (Phase 24)
+        # ------------------------------------------------------
+        
+        # is_clean: Identity must be strong, and presence/gaze shouldn't be extreme violations
+        is_clean = (uc1_sim > 0.70 and presence_prob < 0.6 and g_t_prob < 0.7)
+        if is_clean:
+            self.stability_counter += 1
+        else:
+            self.stability_counter = 0
+
+        if self.stability_counter >= self.stability_threshold:
+            # Clear temporal memory to reset sticky risk scores
+            self.uc5.reset() # Clears GRU buffer
+            self.stability_counter = 0
+            print("[Engine] ⚡ FAST RECOVERY: Cleared temporal history after sustained stability.")
+
+        # ------------------------------------------------------
         # UC5 — Risk Fusion (Sentinel 7-Signal Suite)
         # ------------------------------------------------------
 
@@ -231,6 +255,16 @@ class ProctoringEngine:
             audio_prob
         )
 
+        # Determine Primary Violation for UI help
+        violation_type = "SAFE"
+        if risk > 0.7:
+            if uc1_sim < 0.5: violation_type = "IDENTITY_MISMATCH"
+            elif presence_prob > 0.7: violation_type = "BEYOND_SCREEN_BOUNDARY"
+            elif g_t_prob > 0.8: violation_type = "OFFSCREEN_GAZE"
+            elif h_t_prob > 0.8: violation_type = "UNNATURAL_POSTURE"
+            elif audio_prob > 0.8: violation_type = "SOPHISTICATED_AUDIO_ANOMALY"
+            else: violation_type = "GENERAL_SUSPICIOUS_BEHAVIOR"
+
         print(
             f"[Engine] Sim: {uc1_sim:.4f} | "
             f"Instability: {uc2_prob:.4f} | "
@@ -240,7 +274,7 @@ class ProctoringEngine:
             f"HGDM: {h_t_prob:.4f} | "
             f"Audio: {audio_prob:.4f} | "
             f"Risk: {risk:.4f} | "
-            f"Uncertainty: {uncertainty:.4f}"
+            f"V: {violation_type}"
         )
 
         return {
@@ -252,7 +286,8 @@ class ProctoringEngine:
             "hgdm_prob": h_t_prob,
             "uc6_audio": audio_prob,
             "risk": risk,
-            "uncertainty": uncertainty
+            "uncertainty": uncertainty,
+            "violation_type": violation_type
         }
 
     
