@@ -512,9 +512,13 @@ Predictive calibration is also evaluated using the Brier Score and Expected Cali
 \section{Results}
 \label{sec:results}
 
+The evaluation of the Temporal Behavioral Inference Engine (TBIE) reveals high classification accuracy and predictive calibration under the multi-modal testbed. However, it is vital to emphasize that these reported metrics primarily validate architectural consistency under controlled temporal conditions rather than claim unconstrained deployment-grade real-world accuracy. Real-world exam environments exhibit a high degree of non-stationarity, lighting perturbations, and human behavioral variability that are only partially captured by our synthetic and cohort-based sequences. Thus, these empirical figures should be interpreted as an upper bound of theoretical architectural performance under clean, annotated sequence conditions.
+
 \subsection{Signal Ablation}
 
-Table~\ref{tab:ablation} presents leave-one-out ablation results. Removing LDD produces the largest drop ($\Delta\mathrm{AUC} = {-}0.0410$, $\Delta\mathrm{Brier} = {+}0.0671$), confirming that long-horizon drift detection is the most critical component. LDD is the only expert accumulating 120~frames of embedding displacement, making it uniquely capable of detecting slow substitution that short-window models miss entirely.
+Table~\ref{tab:ablation} presents the leave-one-out ablation results across the seven modular behavioral channels. Removing LDD produces the largest drop ($\Delta\mathrm{AUC} = {-}0.0410$, $\Delta\mathrm{Brier} = {+}0.0671$), confirming that long-horizon drift detection is the most critical component. LDD is the only expert accumulating 120~frames of embedding displacement, making it uniquely capable of detecting slow substitution that short-window models miss entirely.
+
+Notably, the removal of the Acoustic Anomaly Model (AAM) results in a modest statistical drop in global sequence AUC ($\Delta\mathrm{AUC} = -0.0027$). This small margin should not be misconstrued as modal redundancy. While visual signals (pose, gaze, identity) represent highly correlated spatial structures that dominate the overall sequence metrics, the acoustic channel serves as an orthogonal, high-entropy safety barrier. In real-world proctoring, suspicious vocal communication is an episodic, visual-independent violation. The AAM is architecturally vital because it provides an independent safety layer designed to capture auditory violations to which a visual-only proctoring engine is fundamentally blind, rather than acting as a dominant driver of spatial pose accuracy.
 
 \begin{table}[!ht]
 \caption{Leave-One-Out Signal Ablation}
@@ -775,7 +779,7 @@ RFE (GRU) & 4.2\,K & 0.03\,MB & 3.05\,ms \\
 \end{tabular}
 \end{table}
 
-The backbone dominates latency (57.8\%) and parameters (95.6\%). All non-backbone components require only 34.91\,ms and 3.89\,MB, well within the 33.3\,ms real-time budget at 30\,FPS. For strict CPU-only deployment, the ResNet-50 backbone can be substituted with MobileNetV3~\cite{Howard2019} or EfficientNet-Lite~\cite{Tan2019}.
+The ResNet-50 backbone dominates computational complexity, representing 57.8\% of total frame latency and 95.6\% of model parameters. While all downstream temporal experts are highly compressed and easily run locally at a minimal footprint, concurrent client-side execution of the visual backbone remains demanding. To reconcile this, the system is designed to support a hybrid edge-cloud execution paradigm: computationally heavy facial embedding generation (stage 1) is offloaded to a server-side accelerated cloud GPU API, whereas the client browser processes only the lightweight temporal expert inference (stage 2) on local CPU cycles. For strict standalone CPU-only client execution, the ResNet-50 backbone can be substituted with lightweight alternatives like MobileNetV3~\cite{Howard2019} or EfficientNet-Lite~\cite{Tan2019} via ONNX or TensorFlow.js.
 
 
 % ===================================================================

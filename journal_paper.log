@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.3)  22 MAY 2026 22:05
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.3)  22 MAY 2026 22:15
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -647,10 +647,10 @@ l.491     \item
 <ablation.jpg, id=433, 1337.99875pt x 808.01875pt>
 File: ablation.jpg Graphic file (type jpg)
 <use ablation.jpg>
-Package pdftex.def Info: ablation.jpg  used on input line 539.
+Package pdftex.def Info: ablation.jpg  used on input line 543.
 (pdftex.def)             Requested size: 252.0pt x 152.18126pt.
 
-Underfull \hbox (badness 3965) in paragraph at lines 540--540
+Underfull \hbox (badness 3965) in paragraph at lines 544--544
 \OT1/ptm/m/n/8 Fig. 4.  []Signal ab-la-tion. Re-mov-ing LDD causes the largest 
 drop
  []
@@ -660,174 +660,170 @@ pdfTeX warning (ext4): destination with the same identifier (name{table.5}) has
  been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.586 
+l.551 
       
 pdfTeX warning (ext4): destination with the same identifier (name{figure.4}) ha
 s been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.586 
-      
+l.551 
+       <./ablation.jpg>]
+Overfull \hbox (68.30814pt too wide) in paragraph at lines 600--613
+ [][] 
+ []
+
+<baselines.jpg, id=450, 1484.54625pt x 811.03pt>
+File: baselines.jpg Graphic file (type jpg)
+<use baselines.jpg>
+Package pdftex.def Info: baselines.jpg  used on input line 627.
+(pdftex.def)             Requested size: 252.0pt x 137.66289pt.
+<failure_modes.png, id=451, 642.4pt x 642.4pt>
+File: failure_modes.png Graphic file (type png)
+<use failure_modes.png>
+Package pdftex.def Info: failure_modes.png  used on input line 633.
+(pdftex.def)             Requested size: 252.0pt x 251.99553pt.
+[9
 pdfTeX warning (ext4): destination with the same identifier (name{table.6}) has
  been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.586 
-       <./ablation.jpg>]
-Overfull \hbox (68.30814pt too wide) in paragraph at lines 596--609
- [][] 
- []
-
-<baselines.jpg, id=451, 1484.54625pt x 811.03pt>
-File: baselines.jpg Graphic file (type jpg)
-<use baselines.jpg>
-Package pdftex.def Info: baselines.jpg  used on input line 623.
-(pdftex.def)             Requested size: 252.0pt x 137.66289pt.
-<failure_modes.png, id=452, 642.4pt x 642.4pt>
-File: failure_modes.png Graphic file (type png)
-<use failure_modes.png>
-Package pdftex.def Info: failure_modes.png  used on input line 629.
-(pdftex.def)             Requested size: 252.0pt x 251.99553pt.
-[9
+l.640 
+      
 pdfTeX warning (ext4): destination with the same identifier (name{table.7}) has
  been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.636 
+l.640 
       
 pdfTeX warning (ext4): destination with the same identifier (name{figure.5}) ha
 s been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.636 
-      
-pdfTeX warning (ext4): destination with the same identifier (name{figure.6}) ha
-s been already used, duplicate ignored
-<argument> ...shipout:D \box_use:N \l_shipout_box 
-                                                  \__shipout_drop_firstpage_...
-l.636 
-       <./baselines.jpg> <./failure_modes.png>]
+l.640 
+       <./baselines.jpg>]
 <calibration.jpg, id=468, 869.2475pt x 882.29625pt>
 File: calibration.jpg Graphic file (type jpg)
 <use calibration.jpg>
-Package pdftex.def Info: calibration.jpg  used on input line 695.
+Package pdftex.def Info: calibration.jpg  used on input line 699.
 (pdftex.def)             Requested size: 252.0pt x 255.77858pt.
 <trajectories.jpg, id=471, 1485.55pt x 808.01875pt>
 File: trajectories.jpg Graphic file (type jpg)
 <use trajectories.jpg>
-Package pdftex.def Info: trajectories.jpg  used on input line 723.
+Package pdftex.def Info: trajectories.jpg  used on input line 727.
 (pdftex.def)             Requested size: 252.0pt x 137.06546pt.
 <evidence_accumulation.jpg, id=472, 1505.625pt x 1204.5pt>
 File: evidence_accumulation.jpg Graphic file (type jpg)
 <use evidence_accumulation.jpg>
-Package pdftex.def Info: evidence_accumulation.jpg  used on input line 729.
+Package pdftex.def Info: evidence_accumulation.jpg  used on input line 733.
 (pdftex.def)             Requested size: 252.0pt x 201.60107pt.
  [10
 pdfTeX warning (ext4): destination with the same identifier (name{table.8}) has
  been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.737 
+l.741 
+      
+pdfTeX warning (ext4): destination with the same identifier (name{figure.6}) ha
+s been already used, duplicate ignored
+<argument> ...shipout:D \box_use:N \l_shipout_box 
+                                                  \__shipout_drop_firstpage_...
+l.741 
       
 pdfTeX warning (ext4): destination with the same identifier (name{table.9}) has
  been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.737 
+l.741 
       
 pdfTeX warning (ext4): destination with the same identifier (name{table.10}) ha
 s been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.737 
+l.741 
       
 pdfTeX warning (ext4): destination with the same identifier (name{table.11}) ha
 s been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.737 
-      
-pdfTeX warning (ext4): destination with the same identifier (name{figure.7}) ha
-s been already used, duplicate ignored
-<argument> ...shipout:D \box_use:N \l_shipout_box 
-                                                  \__shipout_drop_firstpage_...
-l.737 
+l.741 
       
 pdfTeX warning (ext4): destination with the same identifier (name{table.12}) ha
 s been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.737 
-       <./calibration.jpg>]
-<pose_gaze_scatter.jpg, id=487, 1204.5pt x 903.375pt>
+l.741 
+       <./failure_modes.png>]
+<pose_gaze_scatter.jpg, id=486, 1204.5pt x 903.375pt>
 File: pose_gaze_scatter.jpg Graphic file (type jpg)
 <use pose_gaze_scatter.jpg>
-Package pdftex.def Info: pose_gaze_scatter.jpg  used on input line 749.
+Package pdftex.def Info: pose_gaze_scatter.jpg  used on input line 753.
 (pdftex.def)             Requested size: 252.0pt x 188.99756pt.
  [11
+pdfTeX warning (ext4): destination with the same identifier (name{figure.7}) ha
+s been already used, duplicate ignored
+<argument> ...shipout:D \box_use:N \l_shipout_box 
+                                                  \__shipout_drop_firstpage_...
+l.783 
+      
 pdfTeX warning (ext4): destination with the same identifier (name{figure.8}) ha
 s been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.789 F
-       or each frame~$t$ and signal~$i \in \{S, U, P, D, G, H\}$, the contri...
-
+l.783 
+      
 pdfTeX warning (ext4): destination with the same identifier (name{figure.9}) ha
 s been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.789 F
-       or each frame~$t$ and signal~$i \in \{S, U, P, D, G, H\}$, the contri...
-
+l.783 
+      
 pdfTeX warning (ext4): destination with the same identifier (name{table.13}) ha
 s been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.789 F
-       or each frame~$t$ and signal~$i \in \{S, U, P, D, G, H\}$, the contri...
-
-pdfTeX warning (ext4): destination with the same identifier (name{figure.10}) h
-as been already used, duplicate ignored
-<argument> ...shipout:D \box_use:N \l_shipout_box 
-                                                  \__shipout_drop_firstpage_...
-l.789 F
-       or each frame~$t$ and signal~$i \in \{S, U, P, D, G, H\}$, the contri...
- <./trajectories.jpg> <./evidence_accumulation.jpg> <./pose_gaze_scatter.jpg>]
-<temporal_attribution.jpg, id=500, 1505.625pt x 1204.5pt>
+l.783 
+       <./calibration.jpg> <./trajectories.jpg> <./evidence_accumulation.jpg>]
+<temporal_attribution.jpg, id=498, 1505.625pt x 1204.5pt>
 File: temporal_attribution.jpg Graphic file (type jpg)
 <use temporal_attribution.jpg>
-Package pdftex.def Info: temporal_attribution.jpg  used on input line 798.
+Package pdftex.def Info: temporal_attribution.jpg  used on input line 802.
 (pdftex.def)             Requested size: 252.0pt x 201.60107pt.
 
-Underfull \hbox (badness 1990) in paragraph at lines 822--823
+Underfull \hbox (badness 1990) in paragraph at lines 826--827
 \OT1/ptm/m/n/10 anomaly di-men-sion or-thog-o-nal to identity-based sig-nals.
  []
 
 [12
+pdfTeX warning (ext4): destination with the same identifier (name{figure.10}) h
+as been already used, duplicate ignored
+<argument> ...shipout:D \box_use:N \l_shipout_box 
+                                                  \__shipout_drop_firstpage_...
+l.835 
+      
 pdfTeX warning (ext4): destination with the same identifier (name{figure.11}) h
 as been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.847 \subsection
-                 {Limitations} <./temporal_attribution.jpg>]
-Underfull \hbox (badness 10000) in paragraph at lines 935--936
+l.835 
+       <./pose_gaze_scatter.jpg> <./temporal_attribution.jpg>] [13]
+Underfull \hbox (badness 10000) in paragraph at lines 939--940
 []\OT1/ptm/m/n/8 A. Paszke \OT1/ptm/m/it/8 et al.\OT1/ptm/m/n/8 , ``Py-Torch: A
 n im-per-a-tive style, high-
  []
 
 
-Underfull \hbox (badness 7576) in paragraph at lines 935--936
+Underfull \hbox (badness 7576) in paragraph at lines 939--940
 \OT1/ptm/m/n/8 performance deep learn-ing li-brary,'' in \OT1/ptm/m/it/8 Proc. 
 NeurIPS\OT1/ptm/m/n/8 , 2019,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 935--936
+Underfull \hbox (badness 10000) in paragraph at lines 939--940
 \OT1/ptm/m/n/8 pp. 8026--8037. []$https : / / proceedings . neurips . cc / pape
 r / 2019 / hash /
  []
 
-[13] [14] (./journal_paper.aux)
+[14] (./journal_paper.aux)
  ***********
 LaTeX2e <2025-11-01>
 L3 programming layer <2026-01-19>
@@ -838,7 +834,7 @@ Package rerunfilecheck Info: File `journal_paper.out' has not changed.
 Here is how much of TeX's memory you used:
  12284 strings out of 467525
  190806 string characters out of 5418983
- 634810 words of memory out of 5000000
+ 634811 words of memory out of 5000000
  40824 multiletter control sequences out of 15000+600000
  674790 words of font info for 132 fonts, out of 8000000 for 9000
  1144 hyphenation exceptions out of 8191
@@ -866,7 +862,7 @@ live/2026/texmf-dist/fonts/type1/urw/times/utmb8a.pfb></usr/local/texlive/2026/
 texmf-dist/fonts/type1/urw/times/utmbi8a.pfb></usr/local/texlive/2026/texmf-dis
 t/fonts/type1/urw/times/utmr8a.pfb></usr/local/texlive/2026/texmf-dist/fonts/ty
 pe1/urw/times/utmri8a.pfb>
-Output written on journal_paper.pdf (14 pages, 1770856 bytes).
+Output written on journal_paper.pdf (14 pages, 1772586 bytes).
 PDF statistics:
  703 PDF objects out of 1000 (max. 8388607)
  623 compressed objects within 7 object streams
