@@ -148,29 +148,51 @@ The proctoring logic deployed within TBIE is fundamentally framed as a continuou
 
 ### 5.1 Formulation of the Sequence Problem
 Let an exam session consist of $T$ non-deterministic frames: $\mathcal{S} = \{I_1, I_2, \ldots, I_T\}$. The system's objective is to approximate the posterior probability of an academic integrity violation given all cumulative evidence up to time $t$, anchored against an immutable reference enrollment image $I_{\mathrm{ref}}$:
-$$ \rho_t \approx \mathbb{P}(\text{Violation at } t \mid I_{1:t}, I_{\mathrm{ref}}) $$
+
+$$
+\rho_t \approx \mathbb{P}(\text{Violation at } t \mid I_{1:t}, I_{\mathrm{ref}})
+$$
 
 Because calculating this marginal posterior directly over high-dimensional pixels (e.g., $1920 \times 1080 \times 3$) is intractable, we project the observation space into lower-dimensional semantic embeddings via a frozen ResNet-50 backbone $f_\theta$:
-$$ e_t = \frac{f_\theta(I_t)}{\lVert f_\theta(I_t) \rVert_2} \in \mathbb{R}^{256} $$
+
+$$
+e_t = \frac{f_\theta(I_t)}{\| f_\theta(I_t) \|_2} \in \mathbb{R}^{256}
+$$
 
 ### 5.2 The Risk Vector Construction
 At any given temporal step $t$, the independent temporal experts formulate an aggregated evidence vector $\mathbf{r}_t$. Each element of this vector has been compressed by specialized Bi-LSTM networks operating on a 120-frame hindsight window:
-$$ \mathbf{r}_t = [S_t, \mathrm{IIM}(S_t), \mathrm{PAM}(\mathbf{p}_t), \mathrm{LDD}(\delta_t \| S_t), \mathrm{GAM}(\mathbf{g}_t), \mathrm{HGDM}(\mathbf{hg}_t), \mathrm{AAM}(A_t^{\mathrm{raw}})]^\top \in \mathbb{R}^7 $$
+
+$$
+\mathbf{r}_t = [S_t, \mathrm{IIM}(S_t), \mathrm{PAM}(\mathbf{p}_t), \mathrm{LDD}(\delta_t \| S_t), \mathrm{GAM}(\mathbf{g}_t), \mathrm{HGDM}(\mathbf{hg}_t), \mathrm{AAM}(A_t^{\mathrm{raw}})]^\top \in \mathbb{R}^7
+$$
 
 ### 5.3 Gated Recurrent Fusion and State Updates
 The Risk Fusion Engine (RFE) ingests this vector to update a singular hidden state history $h_t$ via standard GRU non-linearities:
-$$ z_t = \sigma(W_z \mathbf{r}_t + U_z h_{t-1} + b_z) \quad \text{(Update Gate)} $$
-$$ r_t = \sigma(W_r \mathbf{r}_t + U_r h_{t-1} + b_r) \quad \text{(Reset Gate)} $$
-$$ \tilde{h}_t = \tanh(W_h \mathbf{r}_t + U_h (r_t \odot h_{t-1}) + b_h) \quad \text{(Candidate)} $$
-$$ h_t = (1 - z_t) \odot h_{t-1} + z_t \odot \tilde{h}_t \quad \text{(New State)} $$
+
+$$
+\begin{aligned}
+z_t &= \sigma(W_z \mathbf{r}_t + U_z h_{t-1} + b_z) \quad &&\text{(Update Gate)} \\
+r_t &= \sigma(W_r \mathbf{r}_t + U_r h_{t-1} + b_r) \quad &&\text{(Reset Gate)} \\
+\tilde{h}_t &= \tanh(W_h \mathbf{r}_t + U_h (r_t \odot h_{t-1}) + b_h) \quad &&\text{(Candidate)} \\
+h_t &= (1 - z_t) \odot h_{t-1} + z_t \odot \tilde{h}_t \quad &&\text{(New State)}
+\end{aligned}
+$$
 
 ### 5.4 Uncertainty-Aware Gaussian Projection
 Instead of predicting a single point estimate (scalar risk), the RFE predicts a Gaussian distribution over the risk logit, parameterized by mean $\mu_t$ and log-variance $\log \sigma_t^2$, by projecting the multidimensional hidden state through a fully connected layer:
-$$ $[\mu_t, \log \sigma_t^2]^\top = W_o h_t + b_o $$
+
+$$
+[\mu_t, \log \sigma_t^2]^\top = W_o h_t + b_o
+$$
 
 From this projection, we isolate two distinct behavioral parameters:
-$$ \rho_t = \sigma(\mu_t) \quad \text{(Risk Probability)} $$
-$$ \sigma_t = \exp(0.5 \cdot \log \sigma_t^2) \quad \text{(Prediction Confidence / Uncertainty)} $$
+
+$$
+\begin{aligned}
+\rho_t &= \sigma(\mu_t) \quad &&\text{(Risk Probability)} \\
+\sigma_t &= \exp(0.5 \cdot \log \sigma_t^2) \quad &&\text{(Prediction Confidence / Uncertainty)}
+\end{aligned}
+$$
 
 This mathematically averts false accusations. An examinee suffering from momentary webcam glitches will register a spike in $\sigma_t$ (uncertainty) without necessarily spiking $\rho_t$ (risk), allowing the dual-threshold Django backend to discard the frame as "corrupted" rather than "cheating."
 
