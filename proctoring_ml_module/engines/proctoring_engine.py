@@ -143,6 +143,45 @@ class ProctoringEngine:
         if not self.session_active or self.enrollment_embedding is None:
             raise RuntimeError("Session not started.")
 
+        # ─── SECURITY SHIELD: INPUT SANITISATION & BOUNDARY GUARD ───
+        import numpy as np
+        
+        # 1. Validate & Sanitize UC3 Features
+        if uc3_features is not None:
+            uc3_features = np.asarray(uc3_features, dtype=np.float32)
+            if uc3_features.shape != (6,):
+                if uc3_features.size == 6:
+                    uc3_features = uc3_features.reshape((6,))
+                else:
+                    print(f"[Security Warning] Shape mismatch on UC3 features: {uc3_features.shape}. Reverting to neutral.")
+                    uc3_features = np.array([0.5, 0.5, 0.0, 0.0, 0.0, 0.5], dtype=np.float32)
+            # Remove NaNs and Infs (sanitize data poisoning)
+            uc3_features = np.nan_to_num(uc3_features, nan=0.5, posinf=1.0, neginf=0.0)
+
+        # 2. Validate & Sanitize Gaze Features
+        if gaze_features is not None:
+            gaze_features = np.asarray(gaze_features, dtype=np.float32)
+            if gaze_features.shape != (6,):
+                if gaze_features.size == 6:
+                    gaze_features = gaze_features.reshape((6,))
+                else:
+                    print(f"[Security Warning] Shape mismatch on Gaze features: {gaze_features.shape}. Reverting to neutral.")
+                    gaze_features = np.array([0.5, 0.5, 0.5, 0.5, 0.5, 0.5], dtype=np.float32)
+            # Remove NaNs and Infs
+            gaze_features = np.nan_to_num(gaze_features, nan=0.5, posinf=1.0, neginf=0.0)
+
+        # 3. Validate & Sanitize Audio Features
+        if audio_features is not None:
+            try:
+                audio_val = float(audio_features)
+                if np.isnan(audio_val) or np.isinf(audio_val):
+                    audio_features = 0.5
+                else:
+                    audio_features = float(np.clip(audio_val, 0.0, 1.0))
+            except (ValueError, TypeError):
+                audio_features = 0.5
+        # ─────────────────────────────────────────────────────────────
+
         # ------------------------------------------------------
         # UC1 — Identity Embedding
         # ------------------------------------------------------
