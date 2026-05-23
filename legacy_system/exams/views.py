@@ -839,7 +839,7 @@ class ExamSessionViewSet(viewsets.ModelViewSet):
         Now AUTO-PASSES for high-velocity proctoring.
         """
         print(f"ID Card Capture: AUTO-PASS triggered for session {session_id}")
-        return Response({'verified': True})
+        return Response({'verified': True, 'ok': True})
 
     @action(detail=True, methods=['post'])
     def warn_student(self, request, session_id=None):

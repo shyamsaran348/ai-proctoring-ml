@@ -1292,6 +1292,13 @@
         let noFaceStartTime = null; // Track "No Face" duration
         const WARNING_GRACE_PERIOD_MS = 2000;
 
+        // --- Web Audio Live Microphone Globals ---
+        let audioContext = null;
+        let audioAnalyser = null;
+        let microphoneSource = null;
+        let audioDataArray = null;
+        let liveAudioVolume = 0.05;
+
 
         // --- Init ---
         window.onload = function () {
@@ -1550,7 +1557,7 @@
                         const idDataURL = canvas.toDataURL('image/jpeg', 0.9);
                         
                         try {
-                            const r_id = await fetch(`/api/exam-sessions/${sessionId}/capture_id_card/`, {
+                             const r_id = await fetch(`/api/sessions/${sessionId}/capture_id_card/`, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ image: idDataURL })
@@ -1594,13 +1601,43 @@
         // --- Proctoring Logic ---
         async function startProctoring() {
           try {
-            proctoringStream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240, facingMode: 'user' } });
+            // Request both video and audio streams for full multi-modal telemetry
+            proctoringStream = await navigator.mediaDevices.getUserMedia({ 
+              video: { width: 320, height: 240, facingMode: 'user' },
+              audio: true
+            });
             const video = document.createElement('video');
             video.srcObject = proctoringStream;
             video.autoplay = true;
             video.muted = true;
             video.playsInline = true;
-            // Remove style width/height to let CSS control it via container
+
+            // Set up Web Audio API microphone volume analysis
+            try {
+              audioContext = new (window.AudioContext || window.webkitAudioContext)();
+              audioAnalyser = audioContext.createAnalyser();
+              audioAnalyser.fftSize = 256;
+              microphoneSource = audioContext.createMediaStreamSource(proctoringStream);
+              microphoneSource.connect(audioAnalyser);
+              const bufferLength = audioAnalyser.frequencyBinCount;
+              audioDataArray = new Uint8Array(bufferLength);
+              
+              // Periodically compute volume in the background (RMS calculation)
+              setInterval(() => {
+                if (audioAnalyser && audioDataArray) {
+                  audioAnalyser.getByteTimeDomainData(audioDataArray);
+                  let sumSquares = 0.0;
+                  for (let i = 0; i < audioDataArray.length; i++) {
+                    const norm = (audioDataArray[i] - 128) / 128;
+                    sumSquares += norm * norm;
+                  }
+                  const rms = Math.sqrt(sumSquares / audioDataArray.length);
+                  liveAudioVolume = Math.min(1.0, rms * 5.0); // Calibrated volume metric
+                }
+              }, 100);
+            } catch (ae) {
+              console.warn("Web Audio API not supported or mic permission denied", ae);
+            }
 
             const feedContainer = document.getElementById('proctoring-feed');
             feedContainer.innerHTML = '';
@@ -1619,7 +1656,7 @@
             }, 200); // Faster updates (200ms) for smoother risk tracking
 
           } catch (e) {
-            document.getElementById('proctoring-feed').innerHTML = '<div style="color:var(--danger); padding:20px; text-align:center;">Camera Error</div>';
+            document.getElementById('proctoring-feed').innerHTML = '<div style="color:var(--danger); padding:20px; text-align:center;">Camera / Mic Error</div>';
           }
         }
 
@@ -1638,7 +1675,10 @@
             const res = await fetch(`/api/sessions/${currentSession.session_id}/frame/`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ frame: dataURL })
+              body: JSON.stringify({ 
+                frame: dataURL,
+                audio_volume: liveAudioVolume 
+              })
             });
             const data = await res.json();
             updateProctorUI(data); // Call unified updater
