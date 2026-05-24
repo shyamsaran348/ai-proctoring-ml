@@ -7,6 +7,7 @@ export default function BiometricOnboarding({ sessionId, onVerified }) {
   const { user } = useAuth();
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const activeStreamRef = useRef(null);
   
   const [streamActive, setStreamActive] = useState(false);
   const [step, setStep] = useState(1); // 1 = Face, 2 = ID Card, 3 = Complete
@@ -16,15 +17,16 @@ export default function BiometricOnboarding({ sessionId, onVerified }) {
 
   // Initialize Camera
   useEffect(() => {
-    let activeStream = null;
     const startCamera = async () => {
       try {
-        activeStream = await navigator.mediaDevices.getUserMedia({ 
+        const stream = await navigator.mediaDevices.getUserMedia({ 
           video: { width: 640, height: 480, facingMode: "user" },
           audio: false 
         });
+        activeStreamRef.current = stream;
+        
         if (videoRef.current) {
-          videoRef.current.srcObject = activeStream;
+          videoRef.current.srcObject = stream;
           setStreamActive(true);
         }
       } catch (err) {
@@ -34,8 +36,8 @@ export default function BiometricOnboarding({ sessionId, onVerified }) {
     startCamera();
 
     return () => {
-      if (activeStream) {
-         activeStream.getTracks().forEach(track => track.stop());
+      if (activeStreamRef.current) {
+         activeStreamRef.current.getTracks().forEach(track => track.stop());
       }
     };
   }, []);

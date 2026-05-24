@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { Shield, UserPlus, Lock, Mail, AlertCircle, Camera, IdCard, CheckCircle2 } from 'lucide-react';
@@ -20,8 +20,14 @@ export default function Register() {
   const [isLoading, setIsLoading] = useState(false);
   
   const fileInputRef = useRef(null);
-  const { register } = useAuth();
+  const { user, register } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (user) {
+      navigate(user.role === 'faculty' ? '/faculty' : '/dashboard', { replace: true });
+    }
+  }, [user, navigate]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });

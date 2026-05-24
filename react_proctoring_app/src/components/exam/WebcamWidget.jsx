@@ -8,6 +8,9 @@ export default function WebcamWidget({ sessionId, onRiskUpdate, onError }) {
   const [streamActive, setStreamActive] = useState(false);
   const [micActive, setMicActive] = useState(false);
   const pollingInterval = useRef(null);
+  const activeStreamRef = useRef(null);
+  const consecutiveFailures = useRef(0);
+  const [networkWarning, setNetworkWarning] = useState(false);
   
   // Audio Telemetry Ref
   const audioContext = useRef(null);
@@ -20,18 +23,20 @@ export default function WebcamWidget({ sessionId, onRiskUpdate, onError }) {
 
     const initMedia = async () => {
       try {
-        activeStream = await navigator.mediaDevices.getUserMedia({ 
+        const stream = await navigator.mediaDevices.getUserMedia({ 
             video: { width: 640, height: 480, facingMode: "user" },
             audio: true 
         });
         
+        activeStreamRef.current = stream;
+        
         if (videoRef.current) {
-            videoRef.current.srcObject = activeStream;
+            videoRef.current.srcObject = stream;
             setStreamActive(true);
             setMicActive(true);
             
             // Initialize Audio Analyzer
-            setupAudioAnalysis(activeStream);
+            setupAudioAnalysis(stream);
             
             // Start the infinite background proctoring loop
             startProctoringLoop();
@@ -60,7 +65,9 @@ export default function WebcamWidget({ sessionId, onRiskUpdate, onError }) {
 
     return () => {
       if (pollingInterval.current) clearInterval(pollingInterval.current);
-      if (activeStream) activeStream.getTracks().forEach(track => track.stop());
+      if (activeStreamRef.current) {
+        activeStreamRef.current.getTracks().forEach(track => track.stop());
+      }
       if (audioContext.current) audioContext.current.close();
     };
   }, [sessionId, onError]);
@@ -110,6 +117,10 @@ export default function WebcamWidget({ sessionId, onRiskUpdate, onError }) {
          
          const res = await api.post(`/sessions/${sessionId}/frame/`, payload);
          
+         // Successful response clears consecutive failure triggers
+         consecutiveFailures.current = 0;
+         setNetworkWarning(false);
+         
          // Extract response metrics (including faculty commands)
          const data = res.data;
          
@@ -123,6 +134,10 @@ export default function WebcamWidget({ sessionId, onRiskUpdate, onError }) {
          }
        } catch (err) {
          console.warn("Sentinel heartbeat skipped:", err.message);
+         consecutiveFailures.current += 1;
+         if (consecutiveFailures.current >= 3) {
+            setNetworkWarning(true);
+         }
        }
     }, 2000);
   }, [sessionId, captureFrame, onRiskUpdate]);
@@ -135,6 +150,15 @@ export default function WebcamWidget({ sessionId, onRiskUpdate, onError }) {
              <span className="text-xs font-black uppercase tracking-widest leading-loose">
                 Initializing Secure Sentinel <br/> Biometric & Acoustic Link
              </span>
+          </div>
+       )}
+
+       {networkWarning && (
+          <div className="absolute top-16 left-4 right-4 bg-amber-600/90 backdrop-blur-md px-4 py-2.5 rounded-xl text-[10px] font-black text-white shadow-2xl z-20 flex items-center gap-2 border border-amber-500/20 animate-pulse text-left">
+             <span className="text-sm">⚠️</span>
+             <div className="flex-1 tracking-wider uppercase leading-tight">
+                Proctor Heartbeat failing. <br/> Check network uplink stability immediately.
+             </div>
           </div>
        )}
 

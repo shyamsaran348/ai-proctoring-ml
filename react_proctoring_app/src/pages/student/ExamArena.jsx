@@ -18,6 +18,7 @@ export default function ExamArena() {
   const [problem, setProblem] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isVerified, setIsVerified] = useState(false);
+  const [isArenaActive, setIsArenaActive] = useState(false);
   
   // High-level Risk Management State (bubbles up from Webcam Widget)
   const [riskData, setRiskData] = useState({ risk: 0, violation: null, components: {} });
@@ -142,8 +143,23 @@ export default function ExamArena() {
     fetchProblemDetails();
   }, [activeProblemId]);
 
+  const handleActivateArena = () => {
+    if (document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen()
+        .then(() => {
+          setIsArenaActive(true);
+        })
+        .catch(() => {
+          // Browser configuration fallback
+          setIsArenaActive(true);
+        });
+    } else {
+      setIsArenaActive(true);
+    }
+  };
+
   useEffect(() => {
-    if (!isVerified || timeLeft <= 0) return;
+    if (!isArenaActive || timeLeft <= 0) return;
     const timer = setInterval(() => {
       setTimeLeft(prev => {
         if (prev <= 1) {
@@ -155,10 +171,10 @@ export default function ExamArena() {
       });
     }, 1000);
     return () => clearInterval(timer);
-  }, [isVerified, timeLeft, handleAutoSubmit]);
+  }, [isArenaActive, timeLeft, handleAutoSubmit]);
 
   useEffect(() => {
-    if (!isVerified) return;
+    if (!isArenaActive) return;
     const handleVisibilityChange = () => {
       if (document.hidden) {
         reportViolation('TAB_SWITCH');
@@ -175,15 +191,12 @@ export default function ExamArena() {
     window.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('blur', handleBlur);
     document.addEventListener('fullscreenchange', handleFullscreenChange);
-    if (document.documentElement.requestFullscreen) {
-      document.documentElement.requestFullscreen().catch(() => {});
-    }
     return () => {
       window.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('blur', handleBlur);
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
     };
-  }, [isVerified, reportViolation]);
+  }, [isArenaActive, reportViolation]);
 
   const handleFinalizeAttempt = async (isAuto = false) => {
     if (!isAuto) {
@@ -208,6 +221,42 @@ export default function ExamArena() {
 
   if (!isVerified) {
     return <PreFlightCheck sessionId={sessionId} onVerified={handleBiometricComplete} />;
+  }
+
+  if (!isArenaActive) {
+    return (
+      <div className="fixed inset-0 bg-slate-950 flex items-center justify-center p-6 z-[60] overflow-y-auto">
+        <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800 max-w-lg w-full rounded-3xl p-10 shadow-2xl text-center text-white">
+          <div className="w-20 h-20 bg-indigo-600/30 text-indigo-400 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg border border-indigo-500/20">
+            <Shield size={40} className="animate-pulse" />
+          </div>
+          
+          <h2 className="text-3xl font-black mb-3 uppercase tracking-tight">
+            Secure Overwatch Shield
+          </h2>
+          <p className="text-slate-300 font-medium mb-8 leading-relaxed text-sm">
+            Biometric match validated successfully. Your secure testing slot is synchronized. 
+            Click below to initiate full-screen security overwatch and enter the assessment.
+          </p>
+
+          <div className="bg-slate-950/60 rounded-2xl p-5 mb-8 border border-white/5 text-left text-xs font-semibold text-slate-400 leading-relaxed space-y-2">
+            <div className="flex items-center gap-2 text-indigo-400 font-bold uppercase tracking-wider mb-1">
+              <Activity size={12} /> Proctoring Protocols:
+            </div>
+            <div>• Full-screen browser reinforcement is strictly enforced.</div>
+            <div>• Real-time webcam and decibel feeds will monitor eye-gaze and audio.</div>
+            <div>• Exiting full-screen or switching tabs generates security violations.</div>
+          </div>
+
+          <button
+            onClick={handleActivateArena}
+            className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-[0.15em] hover:bg-indigo-500 transition-all active:scale-95 shadow-xl shadow-indigo-900/30"
+          >
+            Activate Secure Arena
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
