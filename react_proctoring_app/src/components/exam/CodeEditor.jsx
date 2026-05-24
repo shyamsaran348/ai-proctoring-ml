@@ -1,23 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { dracula } from '@uiw/codemirror-theme-dracula';
 import { python } from '@codemirror/lang-python';
 import { javascript } from '@codemirror/lang-javascript';
 import { Play, CheckCircle, XCircle, Code2, AlertTriangle, Send } from 'lucide-react';
 import api from '../../services/api';
-import { useNavigate } from 'react-router-dom';
 
 export default function CodeEditor({ sessionId, problemId }) {
-  const [code, setCode] = useState('def solve():\n    # Write your solution here\n    pass');
+  // Store code draft for each problem to prevent data loss on tab switch
+  const [codeDrafts, setCodeDrafts] = useState({});
+  const [code, setCode] = useState('');
   const [language, setLanguage] = useState('python');
   const [isExecuting, setIsExecuting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [stdout, setStdout] = useState(null);
   const [testResults, setTestResults] = useState(null);
-  
-  const navigate = useNavigate();
+
+  // Load starter code or draft code when active problem changes
+  useEffect(() => {
+    if (!problemId) return;
+
+    if (codeDrafts[problemId]) {
+      setCode(codeDrafts[problemId]);
+    } else {
+      const defaultStarter = language === 'python'
+        ? `def solve(*args):\n    # Write your Python 3 solution here\n    return None\n`
+        : `function solve(...args) {\n    // Write your JavaScript solution here\n    return null;\n}\n`;
+      setCode(defaultStarter);
+    }
+  }, [problemId, language]);
 
   const handleRunCode = async () => {
+    if (!problemId) return;
     setIsExecuting(true);
     setStdout(null);
     setTestResults(null);
@@ -41,19 +55,35 @@ export default function CodeEditor({ sessionId, problemId }) {
     }
   };
 
-  const handleFinalSubmit = async () => {
-    const confirm = window.confirm("Are you ready to submit your exam? You cannot undo this.");
-    if (!confirm) return;
-
+  const handleSubmitProblem = async () => {
+    if (!problemId) return;
     setIsSubmitting(true);
+    setStdout(null);
+    setTestResults(null);
+
     try {
-      // Typically, an assessment suite has a separate mark-complete endpoint
-      // We will mimic submitting the code one last time, then ending the session
-      await api.post(`/sessions/${sessionId}/submit/`, { code, language });
-      // Redirect out
-      navigate('/dashboard');
+      const res = await api.post(`/sessions/${sessionId}/submit/`, {
+        code,
+        language,
+        problem_id: problemId,
+        finalize: false // Do not terminate the multi-problem exam session
+      });
+      
+      const { status: submitStatus, score, max_score, test_results } = res.data;
+      if (test_results) {
+        setTestResults(test_results.map(tr => ({
+          name: tr.test_case_name,
+          input: JSON.parse(tr.input_data || '""'),
+          expected: JSON.parse(tr.expected_output || '""'),
+          actual: JSON.parse(tr.actual_output || '""'),
+          passed: tr.is_passed,
+          error: tr.error_message
+        })));
+      }
+      
+      alert(`🎉 Solution Submitted Successfully!\nStatus: ${submitStatus.toUpperCase()}\nScore: ${score} / ${max_score}`);
     } catch (err) {
-      alert("Failed to finalize exam: " + (err.response?.data?.error || "Unknown error"));
+      alert("Failed to submit solution: " + (err.response?.data?.error || "Unknown error"));
     } finally {
       setIsSubmitting(false);
     }
@@ -88,12 +118,12 @@ export default function CodeEditor({ sessionId, problemId }) {
                 {isExecuting ? 'Running...' : 'Run Tests'}
              </button>
              <button 
-                onClick={handleFinalSubmit}
+                onClick={handleSubmitProblem}
                 disabled={isExecuting || isSubmitting}
                 className="flex items-center px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-800 text-white rounded-lg font-bold text-sm transition-colors shadow-sm"
              >
                 <Send size={16} className="mr-2" />
-                Submit Assessment
+                {isSubmitting ? 'Submitting...' : 'Submit Solution'}
              </button>
           </div>
        </div>
@@ -105,7 +135,15 @@ export default function CodeEditor({ sessionId, problemId }) {
              height="100%"
              theme={dracula}
              extensions={extensions}
-             onChange={(val) => setCode(val)}
+             onChange={(val) => {
+               setCode(val);
+               if (problemId) {
+                 setCodeDrafts(prev => ({
+                   ...prev,
+                   [problemId]: val
+                 }));
+               }
+             }}
              className="text-base font-mono h-full"
              style={{ minHeight: '300px' }}
           />

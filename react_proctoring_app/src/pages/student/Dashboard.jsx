@@ -19,7 +19,7 @@ import {
 export default function Dashboard() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [problems, setProblems] = useState([]);
+  const [exams, setExams] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   
@@ -30,17 +30,20 @@ export default function Dashboard() {
   });
 
   useEffect(() => {
-    fetchProblems();
-  }, []);
+    fetchExams();
+  }, [user]);
 
-  const fetchProblems = async () => {
+  const fetchExams = async () => {
     try {
        setIsLoading(true);
-       const res = await api.get('/problems/');
-       setProblems(res.data);
+       setError(null);
+       const res = await api.get('/contests/', {
+         params: { student_id: user?.username || user?.email }
+       });
+       setExams(res.data);
        
        // Calculate basic stats
-       const comp = res.data.filter(p => p.is_completed).length;
+       const comp = res.data.filter(e => e.status === 'completed').length;
        setStats(prev => ({
          ...prev,
          total: res.data.length,
@@ -53,10 +56,9 @@ export default function Dashboard() {
     }
   };
 
-  const checkAndStartExam = async (problemId) => {
-    // Simply trigger session creation; the arena will handle pre-flight if needed
+  const checkAndStartExam = async (examId) => {
     try {
-      const res = await api.post(`/problems/${problemId}/start_exam/`, {
+      const res = await api.post(`/contests/${examId}/start_exam/`, {
         student_id: user?.email || user?.username,
       });
       const sessionData = res.data;
@@ -117,7 +119,7 @@ export default function Dashboard() {
               
               <div className="relative">
                  <h3 className="text-[10px] font-black uppercase text-indigo-400 tracking-widest mb-4 flex items-center gap-2">
-                    <Activity size={14} /> System Integrtiy
+                    <Activity size={14} /> System Integrity
                  </h3>
                  <p className="text-5xl font-black mb-2">{stats.integrity}</p>
                  <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
@@ -149,9 +151,9 @@ export default function Dashboard() {
             <p className="text-slate-500 font-medium text-sm mt-1 italic">Authorized challenges requiring biometric validation.</p>
           </div>
           <div className="flex gap-2">
-             <div className="bg-white p-2 rounded-xl border border-slate-100 shadow-sm text-slate-400 hover:text-indigo-600 transition-colors cursor-pointer">
+             <div onClick={fetchExams} className="bg-white p-2 rounded-xl border border-slate-100 shadow-sm text-slate-400 hover:text-indigo-600 transition-colors cursor-pointer">
                 <History size={20} />
-             </div>
+              </div>
           </div>
         </div>
 
@@ -176,7 +178,7 @@ export default function Dashboard() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {problems.length === 0 ? (
+            {exams.length === 0 ? (
                <div className="col-span-full py-24 text-center text-slate-400 bg-white rounded-[40px] border border-dashed border-slate-200">
                  <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
                     <BookOpen size={40} className="text-slate-200" />
@@ -185,16 +187,16 @@ export default function Dashboard() {
                  <p className="text-sm font-medium mt-2">No active assessments found in your sectors.</p>
                </div>
             ) : (
-              problems.map(problem => (
+              exams.map(exam => (
                 <div 
-                  key={problem.id} 
+                  key={exam.id} 
                   className={`bg-white rounded-[32px] p-8 border transition-all duration-500 flex flex-col group relative overflow-hidden ${
-                    problem.is_completed 
+                    exam.status === 'completed' 
                     ? 'border-slate-100 opacity-70 bg-slate-50 grayscale' 
                     : 'border-slate-100 hover:border-indigo-500 hover:shadow-2xl hover:shadow-indigo-200/50 hover:-translate-y-2'
                   }`}
                 >
-                  {!problem.is_completed && (
+                  {exam.status !== 'completed' && (
                     <div className="absolute top-0 right-0 px-4 py-1.5 bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest rounded-bl-2xl opacity-0 group-hover:opacity-100 transition-opacity">
                       Secure Session
                     </div>
@@ -202,27 +204,27 @@ export default function Dashboard() {
 
                   <div className="flex justify-between items-start mb-6">
                      <span className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.3em] bg-indigo-50 px-3 py-1 rounded-full">
-                        {problem.is_completed ? 'Redacted' : 'Active Channel'}
+                        {exam.status === 'completed' ? 'Redacted' : 'Active Channel'}
                      </span>
-                     {problem.is_completed && <CheckCircle className="text-emerald-500" size={24} />}
+                     {exam.status === 'completed' && <CheckCircle className="text-emerald-500" size={24} />}
                   </div>
                   
-                  <h3 className="text-2xl font-black text-slate-900 mb-3 group-hover:text-indigo-600 transition-colors uppercase leading-none">{problem.title}</h3>
+                  <h3 className="text-2xl font-black text-slate-900 mb-3 group-hover:text-indigo-600 transition-colors uppercase leading-none">{exam.title}</h3>
                   <p className="text-slate-500 text-sm font-medium mb-10 line-clamp-3 leading-relaxed">
-                    {problem.description || 'Access protocols not defined for this specific assessment tier.'}
+                    {exam.description || 'Access protocols not defined for this specific assessment tier.'}
                   </p>
                   
                   <div className="mt-auto space-y-4">
                     <button
-                      onClick={() => checkAndStartExam(problem.id)}
-                      disabled={problem.is_completed}
+                      onClick={() => checkAndStartExam(exam.id)}
+                      disabled={exam.status === 'completed'}
                       className={`w-full py-4 px-6 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-md group-hover:shadow-indigo-200 ${
-                        problem.is_completed
+                        exam.status === 'completed'
                           ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
                           : 'bg-indigo-600 text-white hover:bg-slate-900 flex justify-center items-center gap-3'
                       }`}
                     >
-                      {problem.is_completed ? 'Validation Complete' : (
+                      {exam.status === 'completed' ? 'Validation Complete' : (
                         <>
                           Establish Uplink <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
                         </>

@@ -183,14 +183,21 @@ def solve(*args):
 class ExamSessionSerializer(serializers.ModelSerializer):
     problem = ProblemSerializer(read_only=True)
     problem_id = serializers.IntegerField(write_only=True)
+    contest_id = serializers.IntegerField(source='contest.id', read_only=True, required=False)
+    problems = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = ExamSession
         fields = [
-            'id', 'session_id', 'problem', 'problem_id', 'start_time', 'end_time',
+            'id', 'session_id', 'problem', 'problem_id', 'contest_id', 'problems', 'start_time', 'end_time',
             'time_remaining', 'status', 'is_submitted'
         ]
         read_only_fields = ['id', 'session_id', 'start_time', 'end_time', 'status', 'is_submitted']
+
+    def get_problems(self, obj):
+        if obj.contest:
+            return [{'id': p.id, 'title': p.title} for p in obj.contest.problems.all()]
+        return []
 
 
 class TestResultSerializer(serializers.ModelSerializer):

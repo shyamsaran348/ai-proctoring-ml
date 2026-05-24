@@ -6,13 +6,15 @@ import WebcamWidget from '../../components/exam/WebcamWidget';
 import ExamAIBriefing from '../../components/exam/ExamAIBriefing';
 import SafeZoneHud from '../../components/exam/SafeZoneHud';
 import CodeEditor from '../../components/exam/CodeEditor';
-import { Shield, BrainCircuit, Activity, Clock, AlertTriangle, Lock, EyeOff } from 'lucide-react';
+import { Shield, BrainCircuit, Activity, Clock, AlertTriangle, Lock, EyeOff, BookOpen } from 'lucide-react';
 
 export default function ExamArena() {
   const { sessionId } = useParams();
   const navigate = useNavigate();
 
   const [sessionData, setSessionData] = useState(null);
+  const [problemsList, setProblemsList] = useState([]);
+  const [activeProblemId, setActiveProblemId] = useState(null);
   const [problem, setProblem] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isVerified, setIsVerified] = useState(false);
@@ -26,10 +28,9 @@ export default function ExamArena() {
   // Sentinel Enforcement State
   const [isLocked, setIsLocked] = useState(false);
   const [lockReason, setLockReason] = useState(null);
-  const [facultyCommand, setFacultyCommand] = useState(null);
   const [isPaused, setIsPaused] = useState(false);
 
-  // ─── Proctored Action Handlers (Defined first to prevent all ReferenceErrors) ───
+  // ─── Proctored Action Handlers ───
   const formatTime = useCallback((seconds) => {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
@@ -93,6 +94,7 @@ export default function ExamArena() {
 
   const handleAutoSubmit = useCallback(() => {
     console.log("Time expired. Triggering auto-submit...");
+    handleFinalizeAttempt(true);
   }, []);
 
   const handleBiometricComplete = useCallback(async () => {
@@ -105,10 +107,16 @@ export default function ExamArena() {
       try {
         const res = await api.get(`/sessions/${sessionId}/`);
         setSessionData(res.data);
-        if (res.data.problem_id) {
-          const probRes = await api.get(`/problems/${res.data.problem_id}/`);
-          setProblem(probRes.data);
-          setTimeLeft((probRes.data.duration_minutes || 60) * 60);
+        setTimeLeft(res.data.time_remaining || 3600);
+        
+        // Load the problems list
+        if (res.data.problems && res.data.problems.length > 0) {
+          setProblemsList(res.data.problems);
+          setActiveProblemId(res.data.problems[0].id);
+        } else if (res.data.problem) {
+          const singleProb = { id: res.data.problem.id, title: res.data.problem.title };
+          setProblemsList([singleProb]);
+          setActiveProblemId(singleProb.id);
         }
       } catch (err) {
         alert("Session invalid or expired.");
@@ -119,6 +127,20 @@ export default function ExamArena() {
     };
     fetchSessionInfo();
   }, [sessionId, navigate]);
+
+  // Load active problem details
+  useEffect(() => {
+    if (!activeProblemId) return;
+    const fetchProblemDetails = async () => {
+      try {
+        const probRes = await api.get(`/problems/${activeProblemId}/`);
+        setProblem(probRes.data);
+      } catch (err) {
+        console.error("Failed to load problem details.");
+      }
+    };
+    fetchProblemDetails();
+  }, [activeProblemId]);
 
   useEffect(() => {
     if (!isVerified || timeLeft <= 0) return;
@@ -140,17 +162,14 @@ export default function ExamArena() {
     const handleVisibilityChange = () => {
       if (document.hidden) {
         reportViolation('TAB_SWITCH');
-        // triggerIronCurtain('TAB_SWITCH_DETECTED'); // Disabled for Testing
       }
     };
     const handleBlur = () => {
       reportViolation('WINDOW_BLUR');
-      // triggerIronCurtain('FOCUS_LOSS_DETECTED'); // Disabled for Testing
     };
     const handleFullscreenChange = () => {
       if (!document.fullscreenElement) {
         reportViolation('FULLSCREEN_EXIT');
-        // triggerIronCurtain('SECURE_VIEW_EXITED'); // Disabled for Testing
       }
     };
     window.addEventListener('visibilitychange', handleVisibilityChange);
@@ -164,7 +183,24 @@ export default function ExamArena() {
       window.removeEventListener('blur', handleBlur);
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
     };
-  }, [isVerified, reportViolation, triggerIronCurtain]);
+  }, [isVerified, reportViolation]);
+
+  const handleFinalizeAttempt = async (isAuto = false) => {
+    if (!isAuto) {
+      const confirm = window.confirm("Are you ready to submit your exam attempt? This will end all problem streams and secure AI proctoring immediately.");
+      if (!confirm) return;
+    }
+
+    try {
+      await api.post(`/sessions/${sessionId}/submit/`, {
+        finalize: true
+      });
+      alert("🎉 Secure Assessment Node Finalized. Your attempts have been saved.");
+      navigate('/dashboard');
+    } catch (err) {
+      alert("Failed to finalize session: " + (err.response?.data?.error || "Unknown error"));
+    }
+  };
 
   if (isLoading) {
     return <div className="min-h-screen flex items-center justify-center bg-gray-50"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div></div>;
@@ -230,7 +266,9 @@ export default function ExamArena() {
                 <BrainCircuit size={24} />
              </div>
              <div>
-               <h1 className="text-xl font-black text-slate-800 tracking-tight leading-tight uppercase">{problem?.title || 'Exam Session'}</h1>
+               <h1 className="text-xl font-black text-slate-800 tracking-tight leading-tight uppercase">
+                 {sessionData?.contest?.title || 'Secure Assessment Node'}
+               </h1>
                <div className="flex items-center gap-2 mt-0.5">
                   <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
                   <p className="text-[10px] text-emerald-600 font-black uppercase tracking-[0.2em]">Enforcement Active</p>
@@ -246,8 +284,8 @@ export default function ExamArena() {
 
           <div className="flex items-center space-x-4">
              <button 
-               className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-indigo-100 transition-all active:scale-95"
-               onClick={() => console.log("Manual submit request")}
+               className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-indigo-100 transition-all active:scale-95"
+               onClick={() => handleFinalizeAttempt(false)}
              >
                Finalize Attempt
              </button>
@@ -256,6 +294,28 @@ export default function ExamArena() {
              </div>
           </div>
        </header>
+
+       {/* Problems Switcher Tabs (For Multi-problem contests) */}
+       {problemsList.length > 1 && (
+         <div className="bg-white border-b border-slate-200 px-6 py-3 flex gap-3 z-10 shadow-sm shrink-0">
+           {problemsList.map((p, idx) => {
+             const isActive = activeProblemId === p.id;
+             return (
+               <button
+                 key={p.id}
+                 onClick={() => setActiveProblemId(p.id)}
+                 className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 ${
+                   isActive
+                     ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100'
+                     : 'bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100'
+                 }`}
+               >
+                 Problem {idx + 1}: {p.title}
+               </button>
+             );
+           })}
+         </div>
+       )}
 
        {/* Workspace Matrix */}
        <main className="flex-1 flex overflow-hidden">
@@ -266,12 +326,45 @@ export default function ExamArena() {
              {/* Problem Content */}
              <div className="p-8 border-b border-gray-100 flex-1">
                 <h2 className="text-2xl font-extrabold text-gray-900 mb-6 flex items-center">
-                   <Shield className="mr-3 text-emerald-500" size={28}/> Task Overview
+                   <Shield className="mr-3 text-emerald-500" size={28}/> Task Descriptor
                 </h2>
-                <div className="prose prose-indigo prose-sm text-gray-700 leading-relaxed font-medium">
-                   {/* In a real scenario, this would render HTML/Markdown */}
-                   {problem?.description}
-                </div>
+                {problem ? (
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">{problem.title}</h3>
+                      <p className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full inline-block mt-1 uppercase tracking-wider">{problem.difficulty} • {problem.points} points</p>
+                    </div>
+                    <div className="prose prose-indigo prose-sm text-gray-700 leading-relaxed font-medium whitespace-pre-wrap">
+                       {problem.problem_statement || problem.description}
+                    </div>
+                    {problem.input_format && (
+                      <div>
+                        <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-1">Input Format</h4>
+                        <p className="text-xs font-medium text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100">{problem.input_format}</p>
+                      </div>
+                    )}
+                    {problem.output_format && (
+                      <div>
+                        <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-1">Output Format</h4>
+                        <p className="text-xs font-medium text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100">{problem.output_format}</p>
+                      </div>
+                    )}
+                    {problem.sample_input && (
+                      <div>
+                        <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-1">Sample Input</h4>
+                        <pre className="text-xs font-mono bg-slate-900 text-slate-100 p-3 rounded-xl overflow-x-auto">{problem.sample_input}</pre>
+                      </div>
+                    )}
+                    {problem.sample_output && (
+                      <div>
+                        <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-1">Sample Output</h4>
+                        <pre className="text-xs font-mono bg-slate-900 text-slate-100 p-3 rounded-xl overflow-x-auto">{problem.sample_output}</pre>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="py-20 text-center text-slate-400 animate-pulse">Loading problem descriptor...</div>
+                )}
              </div>
 
              {/* AI Proctoring Stack Widget */}
@@ -316,7 +409,7 @@ export default function ExamArena() {
                                <div className="flex items-center gap-2">
                                   <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></div>
                                   <span className="text-[10px] font-black text-slate-700 uppercase tracking-tight">{log.type}</span>
-                               </div>
+                                </div>
                                <span className="text-[9px] text-slate-400 font-mono font-bold">{log.timestamp}</span>
                             </div>
                          ))
@@ -328,7 +421,7 @@ export default function ExamArena() {
 
           {/* Right Panel: The Code Arena */}
           <div className="flex-1 p-6 flex flex-col">
-             <CodeEditor sessionId={sessionId} problemId={problem?.id} />
+             <CodeEditor sessionId={sessionId} problemId={activeProblemId} />
           </div>
 
        </main>

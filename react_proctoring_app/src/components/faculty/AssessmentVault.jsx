@@ -15,11 +15,13 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import api from '../../services/api';
+import CreateExamModal from './CreateExamModal';
 
 export default function AssessmentVault({ onOpenDesigner }) {
   const [exams, setExams] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   useEffect(() => {
     fetchExams();
@@ -65,7 +67,10 @@ export default function AssessmentVault({ onOpenDesigner }) {
              <Clock size={14} className={isLoading ? 'animate-spin' : ''} />
              Sync Repository
           </button>
-          <button className="btn-primary flex items-center gap-2 group">
+          <button 
+            onClick={() => setIsCreateOpen(true)}
+            className="btn-primary flex items-center gap-2 group"
+          >
              <Plus size={16} className="group-hover:rotate-90 transition-transform duration-300" />
              Create New Node
           </button>
@@ -100,7 +105,7 @@ export default function AssessmentVault({ onOpenDesigner }) {
             </div>
             <div className="relative z-10">
                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Protected</p>
-               <p className="text-xl font-black text-slate-900">{exams.filter(e => e.proctoring).length}</p>
+               <p className="text-xl font-black text-slate-900">{exams.filter(e => e.proctoring || e.enable_proctoring).length}</p>
             </div>
          </div>
       </div>
@@ -112,7 +117,7 @@ export default function AssessmentVault({ onOpenDesigner }) {
                <input 
                   type="text" 
                   placeholder="Search assessment nodes..."
-                  className="w-full pl-12 pr-4 py-3 bg-slate-50 border-none rounded-2xl text-sm font-medium focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                  className="w-full pl-12 pr-4 py-3 bg-slate-50 border-none rounded-2xl text-sm font-medium focus:ring-2 focus:ring-indigo-500/20 transition-all animate-in"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                />
@@ -135,23 +140,23 @@ export default function AssessmentVault({ onOpenDesigner }) {
                     <div key={exam.id} className="group bg-white p-5 rounded-2xl border border-slate-50 hover:border-indigo-100 hover:bg-indigo-50/10 transition-all duration-300 flex items-center justify-between">
                        <div className="flex items-center gap-5">
                           <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-xs uppercase tracking-tighter ${
-                             exam.type === 'coding' ? 'bg-indigo-600 text-white' : 
-                             exam.type === 'mcq' ? 'bg-emerald-500 text-white' : 
+                             exam.contest_type === 'coding' || exam.type === 'coding' ? 'bg-indigo-600 text-white' : 
+                             exam.contest_type === 'mcq' || exam.type === 'mcq' ? 'bg-emerald-500 text-white' : 
                              'bg-slate-900 text-white'
                           }`}>
-                             {exam.type === 'coding' ? 'Code' : exam.type === 'mcq' ? 'MCQ' : 'Hybr'}
+                             {exam.contest_type === 'coding' || exam.type === 'coding' ? 'Code' : exam.contest_type === 'mcq' || exam.type === 'mcq' ? 'MCQ' : 'Hybr'}
                           </div>
                           <div>
                              <h4 className="text-lg font-black text-slate-900 uppercase tracking-tight group-hover:text-indigo-600 transition-colors">{exam.title}</h4>
                              <div className="flex items-center gap-4 mt-1">
                                 <span className="flex items-center gap-1.5 text-xs font-bold text-slate-400">
-                                   <Users size={12} /> {exam.participants} Participants
+                                   <Users size={12} /> {exam.participants?.length || exam.participants || 0} Participants
                                 </span>
                                 <span className="flex items-center gap-1.5 text-xs font-bold text-slate-400">
-                                   <Clock size={12} /> {exam.date}
+                                   <Clock size={12} /> {exam.duration_minutes} Minutes
                                 </span>
-                                {exam.proctoring && (
-                                   <span className="flex items-center gap-1 text-[9px] font-black uppercase text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
+                                {(exam.proctoring || exam.enable_proctoring) && (
+                                   <span className="flex items-center gap-1 text-[9px] font-black uppercase text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100 animate-pulse">
                                       AI Protected
                                    </span>
                                 )}
@@ -180,6 +185,13 @@ export default function AssessmentVault({ onOpenDesigner }) {
            )}
         </div>
       </div>
+
+      {isCreateOpen && (
+        <CreateExamModal 
+          onClose={() => setIsCreateOpen(false)} 
+          onCreated={fetchExams} 
+        />
+      )}
     </div>
   );
 }

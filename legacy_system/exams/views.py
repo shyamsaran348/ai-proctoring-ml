@@ -399,9 +399,25 @@ class ContestViewSet(viewsets.ModelViewSet):
     authentication_classes = [NoCSRFSessionAuthentication]
 
     def get_queryset(self):
-        if self.request.user.is_staff:
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            # Fallback to query param for development/testing
+            student_id = self.request.query_params.get('student_id')
+            if student_id:
+                user = User.objects.filter(username=student_id).first() or User.objects.filter(email=student_id).first()
+        
+        if not user or not user.is_authenticated:
+            return Contest.objects.none()
+            
+        if user.is_staff:
             return Contest.objects.all().order_by('-start_time')
-        return Contest.objects.filter(created_by=self.request.user).order_by('-start_time')
+            
+        # Standard students: return active contests they are participant in OR public contests
+        from django.db.models import Q
+        return Contest.objects.filter(
+            Q(participants__user=user) | Q(visibility='public'),
+            status='active'
+        ).distinct().order_by('-start_time')
 
     @action(detail=True, methods=['get'])
     def exam_designer(self, request, pk=None):
@@ -463,6 +479,75 @@ class ContestViewSet(viewsets.ModelViewSet):
              
         return Response({'ok': True})
 
+    @action(detail=True, methods=['post'])
+    def start_exam(self, request, pk=None):
+        """Start a secure proctored contest session for a student"""
+        contest = self.get_object()
+        student_id = request.data.get('student_id') or (request.user.username if request.user and request.user.is_authenticated else None)
+        if not student_id:
+            return Response({'error': 'student_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        user = User.objects.filter(username=student_id).first() or User.objects.filter(email=student_id).first()
+        if not user:
+            return Response({'error': f'Student "{student_id}" not found'}, status=status.HTTP_404_NOT_FOUND)
+            
+        # Enrollment Gate
+        if contest.visibility in ['invite_only', 'private']:
+            is_enrolled = contest.participants.filter(user=user, is_active=True).exists()
+            if not is_enrolled:
+                return Response({'error': 'You are not assigned to this secure assessment.'}, status=status.HTTP_403_FORBIDDEN)
+                
+        # Check completed sessions
+        completed = ExamSession.objects.filter(contest=contest, student=user, status='completed').exists()
+        if completed:
+            return Response({
+                'error': 'You have already completed this secure exam.',
+                'completed': True
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+        # Get or create active session
+        session, created = ExamSession.objects.get_or_create(
+            contest=contest,
+            student=user,
+            status='active',
+            defaults={
+                'session_id': str(uuid.uuid4()),
+                'time_remaining': contest.duration_minutes * 60,
+                'problem': contest.problems.all().first()
+            }
+        )
+        
+        VERIFICATION_STATUS[session.session_id] = 'pending_frontend'
+        
+        return Response({
+            'session_id': session.session_id,
+            'contest_id': contest.id,
+            'time_remaining': session.time_remaining,
+            'problems': [
+                {'problem_id': p.id, 'title': p.title} for p in contest.problems.all()
+            ]
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def enroll_students(self, request, pk=None):
+        """Enroll specific candidates (students) to this private assessment"""
+        if not request.user.is_staff:
+             return Response({'error': 'Unauthorized'}, status=403)
+             
+        contest = self.get_object()
+        student_ids = request.data.get('student_ids', [])
+        
+        from .models import ContestParticipant
+        
+        enrolled_count = 0
+        for s_id in student_ids:
+            user = User.objects.filter(username=s_id).first() or User.objects.filter(email=s_id).first()
+            if user:
+                ContestParticipant.objects.get_or_create(contest=contest, user=user)
+                enrolled_count += 1
+                
+        return Response({'ok': True, 'enrolled_count': enrolled_count})
+
 class ExamSessionViewSet(viewsets.ModelViewSet):
     queryset = ExamSession.objects.all()
     serializer_class = ExamSessionSerializer
@@ -492,144 +577,164 @@ class ExamSessionViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({'error': f'Session not found: {str(e)}'}, status=status.HTTP_404_NOT_FOUND)
 
+        finalize = request.data.get('finalize', False)
         code = request.data.get('code')
         lang_name = request.data.get('language', 'javascript')
-        if not code:
+        
+        if not code and not finalize:
             return Response({'error': 'Code is required'}, status=status.HTTP_400_BAD_REQUEST)
         
-        # Debug logging
-        print(f"Submit request - Session: {session_id}, Language: {lang_name}, Code length: {len(code) if code else 0}")
-
-        try:
-            lang_obj = Language.objects.get(name__iexact=lang_name)
-        except Language.DoesNotExist:
-            # Try to create default languages if they don't exist
-            if lang_name.lower() in ['javascript', 'js']:
-                lang_obj, created = Language.objects.get_or_create(
-                    name='javascript',
-                    defaults={
-                        'display_name': 'JavaScript',
-                        'docker_image': 'node:latest',
-                        'execute_command': 'node',
-                        'file_extension': '.js',
-                        'default_code': 'function solve(...args) {\n  return null;\n}'
-                    }
-                )
-            elif lang_name.lower() in ['python', 'py']:
-                lang_obj, created = Language.objects.get_or_create(
-                    name='python',
-                    defaults={
-                        'display_name': 'Python',
-                        'docker_image': 'python:latest',
-                        'execute_command': 'python',
-                        'file_extension': '.py',
-                        'default_code': 'def solve(*args):\n    return None'
-                    }
-                )
-            else:
-                return Response({'error': f'Language "{lang_name}" not supported'}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Get user from request if available
-        user_obj = None
-        if request.user and request.user.is_authenticated:
-            user_obj = request.user
-        else:
-            # Try to get user from student_id in request data
-            student_id = request.data.get('student_id')
-            if student_id:
-                user_obj = User.objects.filter(username=student_id).first()
+        submission_data = None
         
-        try:
-            submission = Submission.objects.create(
-                exam_session=exam_session,
-                user=user_obj,  # Link to user if available
-                problem=exam_session.problem,
-                contest=exam_session.contest,
-                code=code,
-                language=lang_obj,
-                status='running',
-                max_score=exam_session.problem.points if exam_session.problem else 0
-            )
-        except Exception as e:
-            return Response({'error': f'Failed to create submission: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+        if code:
+            # Debug logging
+            print(f"Submit request - Session: {session_id}, Language: {lang_name}, Code length: {len(code)}")
 
-        # Build test data
-        try:
-            test_cases = exam_session.problem.test_cases.filter(is_active=True).order_by('order', 'id')
-            test_data = []
-            for tc in test_cases:
-                test_data.append({
-                    'name': tc.name,
-                    'input': tc.input_data,
-                    'expected': tc.expected_output
-                })
-        except Exception as e:
-            return Response({'error': f'Failed to process test cases: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Execute
-        code_executor = CodeExecutionView()
-        results = code_executor.execute_code(code, lang_name, test_data)
-
-        # Aggregate + persist
-        passed = sum(1 for r in results if r.get('passed'))
-        total = len(results)
-        submission.results_summary = results
-        submission.status = 'accepted' if passed == total and total > 0 else 'wrong_answer'
-        submission.score = int((passed / total) * submission.max_score) if total else 0
-        submission.save()
-
-        # Detailed rows
-        try:
-            for i, result in enumerate(results):
-                if i < len(test_cases):
-                    tc = test_cases[i]
-                    TestResult.objects.create(
-                        submission=submission,
-                        test_case=tc,
-                        input_data=json.dumps(_safe_json_loads(result['input'], [])),
-                        expected_output=json.dumps(_safe_json_loads(result['expected'], None)),
-                        actual_output=json.dumps(result.get('actual')),
-                        is_passed=bool(result.get('passed')),
-                        execution_time=None,
-                        error_message=str(result.get('error') or '')
+            try:
+                lang_obj = Language.objects.get(name__iexact=lang_name)
+            except Language.DoesNotExist:
+                # Try to create default languages if they don't exist
+                if lang_name.lower() in ['javascript', 'js']:
+                    lang_obj, created = Language.objects.get_or_create(
+                        name='javascript',
+                        defaults={
+                            'display_name': 'JavaScript',
+                            'docker_image': 'node:latest',
+                            'execute_command': 'node',
+                            'file_extension': '.js',
+                            'default_code': 'function solve(...args) {\n  return null;\n}'
+                        }
                     )
-        except Exception as e:
-            print(f"Warning: Failed to create test results: {str(e)}")
-            # Continue execution even if test results fail
+                elif lang_name.lower() in ['python', 'py']:
+                    lang_obj, created = Language.objects.get_or_create(
+                        name='python',
+                        defaults={
+                            'display_name': 'Python',
+                            'docker_image': 'python:latest',
+                            'execute_command': 'python',
+                            'file_extension': '.py',
+                            'default_code': 'def solve(*args):\n    return None'
+                        }
+                    )
+                else:
+                    return Response({'error': f'Language "{lang_name}" not supported'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Mark session as completed
-        exam_session.is_submitted = True
-        exam_session.status = 'completed'
-        from django.utils import timezone
-        exam_session.end_time = timezone.now()
-        exam_session.save()
-
-        # Stop monitoring & Persist ML Metrics
-        try:
-            proctor = PROCTORING_INSTANCES.pop(exam_session.session_id, None)
-            if proctor:
-                proctor.stop_monitoring()
-                # 1. Sync final risk to ProctoringSession
-                final_status = proctor.get_live_status()
-                
-                # 2. Update/Create ProctoringSession record
-                from .models import ProctoringSession
-                proc_data, _ = ProctoringSession.objects.get_or_create(
+            # Get user from request if available
+            user_obj = None
+            if request.user and request.user.is_authenticated:
+                user_obj = request.user
+            else:
+                # Try to get user from student_id in request data
+                student_id = request.data.get('student_id')
+                if student_id:
+                    user_obj = User.objects.filter(username=student_id).first()
+            
+            # Resolve specific problem
+            problem_id = request.data.get('problem_id')
+            problem_obj = None
+            if problem_id:
+                try:
+                    from .models import Problem
+                    problem_obj = Problem.objects.get(id=problem_id)
+                except Problem.DoesNotExist:
+                    pass
+            if not problem_obj:
+                problem_obj = exam_session.problem
+            
+            try:
+                submission = Submission.objects.create(
                     exam_session=exam_session,
-                    defaults={'session_id': exam_session.session_id}
+                    user=user_obj,  # Link to user if available
+                    problem=problem_obj,
+                    contest=exam_session.contest,
+                    code=code,
+                    language=lang_obj,
+                    status='running',
+                    max_score=problem_obj.points if problem_obj else 0
                 )
-                proc_data.risk_score = final_status.get('risk_score', 0.0) * 100 # 0-100 scale
-                proc_data.is_flagged = proc_data.risk_score > 75
-                proc_data.face_detection_failures = final_status.get('anomaly_count', 0)
-                proc_data.save()
+            except Exception as e:
+                return Response({'error': f'Failed to create submission: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
 
-                
-                print(f"[ML Cleanup] Session {exam_session.session_id} finalized. Risk: {proc_data.risk_score:.2f}")
+            # Build test data
+            try:
+                test_cases = problem_obj.test_cases.filter(is_active=True).order_by('order', 'id')
+                test_data = []
+                for tc in test_cases:
+                    test_data.append({
+                        'name': tc.name,
+                        'input': tc.input_data,
+                        'expected': tc.expected_output
+                    })
+            except Exception as e:
+                return Response({'error': f'Failed to process test cases: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
 
-        except Exception as e:
-            print(f"Warning: Failed to finalize proctoring for session {exam_session.session_id}: {str(e)}")
+            # Execute
+            code_executor = CodeExecutionView()
+            results = code_executor.execute_code(code, lang_name, test_data)
 
-        return Response(SubmissionSerializer(submission).data, status=status.HTTP_200_OK)
+            # Aggregate + persist
+            passed = sum(1 for r in results if r.get('passed'))
+            total = len(results)
+            submission.results_summary = results
+            submission.status = 'accepted' if passed == total and total > 0 else 'wrong_answer'
+            submission.score = int((passed / total) * submission.max_score) if total else 0
+            submission.save()
+
+            # Detailed rows
+            try:
+                for i, result in enumerate(results):
+                    if i < len(test_cases):
+                        tc = test_cases[i]
+                        TestResult.objects.create(
+                            submission=submission,
+                            test_case=tc,
+                            input_data=json.dumps(_safe_json_loads(result['input'], [])),
+                            expected_output=json.dumps(_safe_json_loads(result['expected'], None)),
+                            actual_output=json.dumps(result.get('actual')),
+                            is_passed=bool(result.get('passed')),
+                            execution_time=None,
+                            error_message=str(result.get('error') or '')
+                        )
+            except Exception as e:
+                print(f"Warning: Failed to create test results: {str(e)}")
+            
+            submission_data = SubmissionSerializer(submission).data
+
+        # Finalize the entire session if requested
+        if finalize:
+            exam_session.is_submitted = True
+            exam_session.status = 'completed'
+            from django.utils import timezone
+            exam_session.end_time = timezone.now()
+            exam_session.save()
+
+            # Stop monitoring & Persist ML Metrics
+            try:
+                proctor = PROCTORING_INSTANCES.pop(exam_session.session_id, None)
+                if proctor:
+                    proctor.stop_monitoring()
+                    # 1. Sync final risk to ProctoringSession
+                    final_status = proctor.get_live_status()
+                    
+                    # 2. Update/Create ProctoringSession record
+                    from .models import ProctoringSession
+                    proc_data, _ = ProctoringSession.objects.get_or_create(
+                        exam_session=exam_session,
+                        defaults={'session_id': exam_session.session_id}
+                    )
+                    proc_data.risk_score = final_status.get('risk_score', 0.0) * 100 # 0-100 scale
+                    proc_data.is_flagged = proc_data.risk_score > 75
+                    proc_data.face_detection_failures = final_status.get('anomaly_count', 0)
+                    proc_data.save()
+                    
+                    print(f"[ML Cleanup] Session {exam_session.session_id} finalized. Risk: {proc_data.risk_score:.2f}")
+
+            except Exception as e:
+                print(f"Warning: Failed to finalize proctoring for session {exam_session.session_id}: {str(e)}")
+
+        if submission_data:
+            return Response(submission_data, status=status.HTTP_200_OK)
+        return Response({'ok': True, 'session_finalized': True}, status=status.HTTP_200_OK)
 
 
     @action(detail=True, methods=['get'])
