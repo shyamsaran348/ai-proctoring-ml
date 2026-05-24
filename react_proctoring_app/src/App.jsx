@@ -32,6 +32,15 @@ const PrivateRoute = ({ children, requireFaculty }) => {
   return children;
 };
 
+const RootRedirect = () => {
+  const { user, loading } = useAuth();
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen bg-gray-50 font-semibold text-slate-500">Loading Secure Environment...</div>;
+  }
+  if (!user) return <Navigate to="/login" replace />;
+  return <Navigate to={user.role === 'faculty' ? '/faculty' : '/dashboard'} replace />;
+};
+
 export default function App() {
   return (
     <Router>
@@ -70,8 +79,8 @@ export default function App() {
           />
 
           {/* Base Redirect */}
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/" element={<RootRedirect />} />
+          <Route path="*" element={<RootRedirect />} />
         </Routes>
       </AuthProvider>
     </Router>
