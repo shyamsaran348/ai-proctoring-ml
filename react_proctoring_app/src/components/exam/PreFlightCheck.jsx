@@ -25,6 +25,8 @@ export default function PreFlightCheck({ sessionId, onVerified }) {
   useEffect(() => {
     if (currentStep === 0) {
       runNetworkCheck();
+    } else if (currentStep === 1) {
+      runHardwareCheck();
     }
   }, [currentStep]);
 

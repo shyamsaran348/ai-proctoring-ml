@@ -35,13 +35,11 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password, isFaculty = false) => {
     try {
       const endpoint = isFaculty ? '/faculty-login/' : '/login/';
-      const res = await api.post(endpoint, { email, password });
+      await api.post(endpoint, { email, password });
       
-      const userData = {
-        email,
-        role: isFaculty ? 'faculty' : 'student',
-        // If your backend returns the user object, map it here. Otherwise, rely on the cookie for auth.
-      };
+      // Fetch dynamic session check to get full backend user model attributes!
+      const checkRes = await api.get('/auth/session-check/');
+      const userData = checkRes.data.user;
       
       setUser(userData);
       localStorage.setItem('userMeta', JSON.stringify(userData));
@@ -60,15 +58,13 @@ export const AuthProvider = ({ children }) => {
       
       // Handle Multi-part form data for photo uploads (AI Enrollment)
       const isFormData = userData instanceof FormData;
-      const res = await api.post(endpoint, userData, {
+      await api.post(endpoint, userData, {
         headers: isFormData ? { 'Content-Type': 'multipart/form-data' } : {}
       });
       
-      const email = isFormData ? userData.get('email') : userData.email;
-      const savedUser = {
-        email: email,
-        role: isFaculty ? 'faculty' : 'student',
-      };
+      // Fetch dynamic session check to get full backend user model attributes!
+      const checkRes = await api.get('/auth/session-check/');
+      const savedUser = checkRes.data.user;
 
       setUser(savedUser);
       localStorage.setItem('userMeta', JSON.stringify(savedUser));

@@ -25,6 +25,10 @@ const PrivateRoute = ({ children, requireFaculty }) => {
     return <Navigate to="/dashboard" replace />;
   }
 
+  if (!requireFaculty && user.role === 'faculty') {
+    return <Navigate to="/faculty" replace />;
+  }
+
   return children;
 };
 

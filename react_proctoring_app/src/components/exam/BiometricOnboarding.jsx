@@ -1,8 +1,10 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { Camera, CheckCircle, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { apiForm } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 
 export default function BiometricOnboarding({ sessionId, onVerified }) {
+  const { user } = useAuth();
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   
@@ -68,6 +70,7 @@ export default function BiometricOnboarding({ sessionId, onVerified }) {
     try {
       const fd = new FormData();
       fd.append('image', base64Image); // Matched with backend 'image' key
+      fd.append('student_id', user?.username || user?.email || '');
       
       const res = await apiForm.post(`/sessions/${sessionId}/verify_face_snapshot/`, fd);
       
@@ -100,6 +103,7 @@ export default function BiometricOnboarding({ sessionId, onVerified }) {
     try {
       const fd = new FormData();
       fd.append('id_card_data', base64Image);
+      fd.append('student_id', user?.username || user?.email || '');
       
       const res = await apiForm.post(`/sessions/${sessionId}/capture_id_card/`, fd);
       
